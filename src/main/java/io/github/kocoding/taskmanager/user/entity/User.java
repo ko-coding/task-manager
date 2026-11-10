@@ -28,6 +28,12 @@ public class User extends BaseTimeEntity {
     protected User() {
     }
 
+    public User(String name, String email, String passwordHash) {
+        this.name = name;
+        this.email = email;
+        this.passwordHash = passwordHash;
+    }
+
     public Long getId() {
         return id;
     }
