@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: taskmanager
+  profiles:
+    active: true
+  config:
+    import: optional:file:.env[.properties]
+  # データベースへの接続設定
+  datasource:
+    url: jdbc:postgresql://localhost:${DB_PORT:5432}/${DB_NAME}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true

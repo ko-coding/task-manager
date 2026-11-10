@@ -1,0 +1,4 @@
+# SQLログの設定
+logging:
+  level:
+    '[org.hibernate.SQL]': DEBUG
