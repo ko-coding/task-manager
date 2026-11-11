@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import io.github.kocoding.taskmanager.common.exception.ConflictException;
 import io.github.kocoding.taskmanager.user.dto.CreateUserRequest;
 import io.github.kocoding.taskmanager.user.entity.User;
 import io.github.kocoding.taskmanager.user.repository.UserRepository;
@@ -35,8 +36,7 @@ public class UserServiceTest {
     void save_メールアドレスが重複していたら例外() {
         when(userRepository.existsByEmail("test@example.com")).thenReturn(true);
         CreateUserRequest request = new CreateUserRequest("testuser", "test@example.com", "testpassword");
-        // TODO: 独自例外に置き換える
-        assertThrows(RuntimeException.class, () -> userService.save(request));
+        assertThrows(ConflictException.class, () -> userService.save(request));
         verify(userRepository, never()).save(any());
     }
 
