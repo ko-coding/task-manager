@@ -32,4 +32,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(body);
     }
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedException e) {
+        int status = HttpStatus.UNAUTHORIZED.value();
+        ErrorResponse body = new ErrorResponse(status, e.getMessage());
+        return ResponseEntity.status(status).body(body);
+    }
+
 }
