@@ -6,6 +6,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import io.github.kocoding.taskmanager.user.dto.CreateUserRequest;
+import io.github.kocoding.taskmanager.user.dto.UserResponse;
 import io.github.kocoding.taskmanager.user.entity.User;
 import io.github.kocoding.taskmanager.user.repository.UserRepository;
 
@@ -21,14 +22,14 @@ public class UserService {
     }
 
     // ユーザー作成
-    public void save(CreateUserRequest request) {
+    public UserResponse save(CreateUserRequest request) {
         String lowerCaseEmail = request.email().toLowerCase(Locale.ROOT);
         if (userRepository.existsByEmail(lowerCaseEmail)) {
             // TODO: 独自例外に置き換える
             throw new RuntimeException();
         }
         User user = new User(request.name(), lowerCaseEmail, passwordEncoder.encode(request.password()));
-        userRepository.save(user);
+        return UserResponse.from(userRepository.save(user));
     }
 
 }

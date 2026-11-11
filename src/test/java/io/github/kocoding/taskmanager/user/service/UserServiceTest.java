@@ -43,6 +43,7 @@ public class UserServiceTest {
     @Test
     void save_メールアドレスは小文字化パスワードはハッシュ化されて保存() {
         when(passwordEncoder.encode("testpassword")).thenReturn("hashedpassword");
+        when(userRepository.save(any())).thenReturn(new User("testuser", "test@example.com", "hashedpassword"));
         CreateUserRequest request = new CreateUserRequest("testuser", "Test@Example.com", "testpassword");
         userService.save(request);
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
