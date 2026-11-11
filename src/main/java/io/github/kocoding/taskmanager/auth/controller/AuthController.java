@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import io.github.kocoding.taskmanager.user.dto.CreateUserRequest;
 import io.github.kocoding.taskmanager.user.dto.UserResponse;
 import io.github.kocoding.taskmanager.user.service.UserService;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -22,7 +23,7 @@ public class AuthController {
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<UserResponse> signup(@RequestBody CreateUserRequest request) {
+    public ResponseEntity<UserResponse> signup(@Valid @RequestBody CreateUserRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.save(request));
     }
 
