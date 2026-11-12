@@ -7,6 +7,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.github.kocoding.taskmanager.auth.dto.LoginRequest;
+import io.github.kocoding.taskmanager.auth.dto.LoginResponse;
+import io.github.kocoding.taskmanager.auth.service.AuthService;
 import io.github.kocoding.taskmanager.user.dto.CreateUserRequest;
 import io.github.kocoding.taskmanager.user.dto.UserResponse;
 import io.github.kocoding.taskmanager.user.service.UserService;
@@ -17,14 +20,21 @@ import jakarta.validation.Valid;
 public class AuthController {
 
     private final UserService userService;
+    private final AuthService authService;
 
-    public AuthController(UserService userService) {
+    public AuthController(UserService userService, AuthService authService) {
         this.userService = userService;
+        this.authService = authService;
     }
 
     @PostMapping("/signup")
     public ResponseEntity<UserResponse> signup(@Valid @RequestBody CreateUserRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.save(request));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        return ResponseEntity.ok(authService.login(request));
     }
 
 }
