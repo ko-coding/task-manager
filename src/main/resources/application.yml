@@ -2,7 +2,7 @@ spring:
   application:
     name: taskmanager
   profiles:
-    active: true
+    active: dev
   config:
     import: optional:file:.env[.properties]
   # データベースへの接続設定
