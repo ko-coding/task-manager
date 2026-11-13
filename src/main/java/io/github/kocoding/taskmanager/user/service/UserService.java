@@ -6,6 +6,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import io.github.kocoding.taskmanager.common.exception.ConflictException;
+import io.github.kocoding.taskmanager.common.exception.UnauthorizedException;
 import io.github.kocoding.taskmanager.user.dto.CreateUserRequest;
 import io.github.kocoding.taskmanager.user.dto.UserResponse;
 import io.github.kocoding.taskmanager.user.entity.User;
@@ -30,6 +31,12 @@ public class UserService {
         }
         User user = new User(request.name(), lowerCaseEmail, passwordEncoder.encode(request.password()));
         return UserResponse.from(userRepository.save(user));
+    }
+
+    public UserResponse findById(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UnauthorizedException("認証が必要です"));
+        return UserResponse.from(user);
     }
 
 }
