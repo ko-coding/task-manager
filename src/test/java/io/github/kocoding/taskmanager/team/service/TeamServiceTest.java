@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,8 +23,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import io.github.kocoding.taskmanager.common.exception.BadRequestException;
+import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamResponse;
+import io.github.kocoding.taskmanager.team.dto.TeamResponse;
 import io.github.kocoding.taskmanager.team.entity.Team;
 import io.github.kocoding.taskmanager.team.entity.TeamRole;
 import io.github.kocoding.taskmanager.team.entity.TeamUser;
@@ -159,6 +162,33 @@ public class TeamServiceTest {
 
         assertEquals("t.id", orders.get(1).getProperty());
         assertEquals(Sort.Direction.ASC, orders.get(1).getDirection());
+    }
+
+    @Test
+    void findTeam_自分がOWNERとして所属しているチームが返る() {
+        TeamUser expectedTeamUser = new TeamUser(10L, 1L, TeamRole.OWNER);
+        Team expectedTeam = new Team(1L, "hashed", "test_team", "test");
+        ReflectionTestUtils.setField(expectedTeam, "id", 10L);
+
+        when(teamUserRepository.findById(new TeamUserId(10L, 1L)))
+                .thenReturn(Optional.of(expectedTeamUser));
+        when(teamRepository.findById(10L))
+                .thenReturn(Optional.of(expectedTeam));
+
+        TeamResponse response = teamService.findTeam(1L, 10L);
+
+        assertEquals(10L, response.id());
+        assertEquals("test_team", response.name());
+        assertEquals(TeamRole.OWNER, response.role());
+    }
+
+    @Test
+    void findTeam_チームに所属していない場合はNotFoundExceptionが発生しteamRepositoryのfindByIdが呼ばれない() {
+        when(teamUserRepository.findById(new TeamUserId(10L, 1L)))
+                .thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> teamService.findTeam(1L, 10L));
+        verify(teamRepository, never()).findById(any());
     }
 
 }
