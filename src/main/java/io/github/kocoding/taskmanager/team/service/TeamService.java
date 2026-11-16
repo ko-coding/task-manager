@@ -11,12 +11,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import io.github.kocoding.taskmanager.common.exception.BadRequestException;
+import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamResponse;
 import io.github.kocoding.taskmanager.team.dto.TeamResponse;
 import io.github.kocoding.taskmanager.team.entity.Team;
 import io.github.kocoding.taskmanager.team.entity.TeamRole;
 import io.github.kocoding.taskmanager.team.entity.TeamUser;
+import io.github.kocoding.taskmanager.team.entity.TeamUserId;
 import io.github.kocoding.taskmanager.team.repository.TeamRepository;
 import io.github.kocoding.taskmanager.team.repository.TeamUserRepository;
 
@@ -53,6 +55,16 @@ public class TeamService {
         String pattern = toLikePattern(keyword);
         Pageable safePageable = toSafePageable(pageable);
         return teamUserRepository.findTeams(userId, pattern, safePageable);
+    }
+
+    @Transactional(readOnly = true)
+    public TeamResponse findTeam(Long userId, Long teamId) {
+        String message = "チームが存在しません";
+        TeamUser teamUser = teamUserRepository.findById(new TeamUserId(teamId, userId))
+                .orElseThrow(() -> new NotFoundException(message));
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new NotFoundException(message));
+        return TeamResponse.from(team, teamUser.getRole());
     }
 
     private Pageable toSafePageable(Pageable pageable) {
