@@ -30,7 +30,7 @@ import io.github.kocoding.taskmanager.team.repository.TeamUserRepository;
 public class TeamService {
 
     // 許可リスト(クライアントの名前 → JPQLの式)は定数で持つ
-    private static final Map<String, String> allowList = Map.of("name", "t.name", "createdAt", "t.createdAt");
+    private static final Map<String, String> TEAM_SORT_ALLOWLIST = Map.of("name", "t.name", "createdAt", "t.createdAt");
 
     private final TeamRepository teamRepository;
     private final TeamUserRepository teamUserRepository;
@@ -57,7 +57,7 @@ public class TeamService {
     @Transactional(readOnly = true)
     public Page<TeamResponse> findMyTeams(Long userId, String keyword, Pageable pageable) {
         String pattern = toLikePattern(keyword);
-        Pageable safePageable = toSafePageable(pageable);
+        Pageable safePageable = toSafePageable(pageable, TEAM_SORT_ALLOWLIST, "t.name", "t.id");
         return teamUserRepository.findTeams(userId, pattern, safePageable);
     }
 
@@ -98,7 +98,8 @@ public class TeamService {
                 .orElseThrow(() -> new NotFoundException("メンバーが存在しません"));
     }
 
-    private Pageable toSafePageable(Pageable pageable) {
+    private Pageable toSafePageable(Pageable pageable, Map<String, String> allowList, String defaultSort,
+            String tieBreaker) {
         Sort safeSort = Sort.unsorted();
         Sort sort = pageable.getSort();
 
@@ -108,17 +109,17 @@ public class TeamService {
                 // なければ BadRequestException
                 throw new BadRequestException("sortに指定できない項目です:" + order.getProperty());
             }
-            // 2. 許可されたものは JpaSort.unsafe(向き, "t.name") などに変換
+            // 2. 許可されたものは JpaSort.unsafe(向き, 許可リストの式) に変換
             safeSort = safeSort.and(JpaSort.unsafe(order.getDirection(), allowList.get(order.getProperty())));
         }
 
-        // 3. sortの指定がなければ name の昇順
+        // 3. sortの指定がなければ defaultSort の昇順
         if (safeSort.isUnsorted()) {
-            safeSort = safeSort.and(JpaSort.unsafe(Sort.Direction.ASC, "t.name"));
+            safeSort = safeSort.and(JpaSort.unsafe(Sort.Direction.ASC, defaultSort));
         }
 
-        // 4. 最後に t.id の昇順を必ず足す
-        safeSort = safeSort.and(JpaSort.unsafe(Sort.Direction.ASC, "t.id"));
+        // 4. 最後に tieBreaker の昇順を必ず足す
+        safeSort = safeSort.and(JpaSort.unsafe(Sort.Direction.ASC, tieBreaker));
 
         // 5. PageRequest.of(ページ番号, size, sort) で返す
         return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), safeSort);
