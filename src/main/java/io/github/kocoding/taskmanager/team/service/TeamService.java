@@ -17,6 +17,7 @@ import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamResponse;
 import io.github.kocoding.taskmanager.team.dto.JoinTeamRequest;
+import io.github.kocoding.taskmanager.team.dto.TeamMemberResponse;
 import io.github.kocoding.taskmanager.team.dto.TeamResponse;
 import io.github.kocoding.taskmanager.team.entity.Team;
 import io.github.kocoding.taskmanager.team.entity.TeamRole;
@@ -85,6 +86,16 @@ public class TeamService {
 
         TeamUser teamUser = teamUserRepository.save(new TeamUser(team.getId(), userId, TeamRole.MEMBER));
         return TeamResponse.from(team, teamUser.getRole());
+    }
+
+    @Transactional(readOnly = true)
+    public TeamMemberResponse findMember(Long userId, Long teamId, Long targetUserId) {
+        if (!teamUserRepository.existsById(new TeamUserId(teamId, userId))) {
+            throw new NotFoundException("チームが存在しません");
+        }
+
+        return teamUserRepository.findMember(teamId, targetUserId)
+                .orElseThrow(() -> new NotFoundException("メンバーが存在しません"));
     }
 
     private Pageable toSafePageable(Pageable pageable) {
