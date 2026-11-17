@@ -57,6 +57,13 @@ public class TeamController {
         return ResponseEntity.status(HttpStatus.CREATED).body(teamService.join(userId, request));
     }
 
+    @GetMapping("/{teamId}/members")
+    public PagedModel<TeamMemberResponse> getMembers(@AuthenticationPrincipal Long userId, @PathVariable Long teamId,
+            Pageable pageable) {
+        Page<TeamMemberResponse> page = teamService.findMembers(userId, teamId, pageable);
+        return new PagedModel<>(page);
+    }
+
     @GetMapping("/{teamId}/members/{userId}")
     public ResponseEntity<TeamMemberResponse> getMember(@AuthenticationPrincipal Long userId, @PathVariable Long teamId,
             @PathVariable("userId") Long targetUserId) {
