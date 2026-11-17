@@ -23,9 +23,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import io.github.kocoding.taskmanager.common.exception.BadRequestException;
+import io.github.kocoding.taskmanager.common.exception.ConflictException;
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamResponse;
+import io.github.kocoding.taskmanager.team.dto.JoinTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.TeamResponse;
 import io.github.kocoding.taskmanager.team.entity.Team;
 import io.github.kocoding.taskmanager.team.entity.TeamRole;
@@ -189,6 +191,63 @@ public class TeamServiceTest {
 
         assertThrows(NotFoundException.class, () -> teamService.findTeam(1L, 10L));
         verify(teamRepository, never()).findById(any());
+    }
+
+    @Test
+    void join_小文字や空白付きのコードも正規化されて検索される() {
+        JoinTeamRequest request = new JoinTeamRequest(" abcd2345wxyz ");
+        Team expectedTeam = new Team(1L, "hashed", "test_team", "test");
+        ReflectionTestUtils.setField(expectedTeam, "id", 10L);
+        TeamUser expectedTeamUser = new TeamUser(10L, 1L, TeamRole.MEMBER);
+
+        when(teamCodeHasher.hash("ABCD2345WXYZ"))
+                .thenReturn("hashed");
+        when(teamRepository.findByCodeHash("hashed"))
+                .thenReturn(Optional.of(expectedTeam));
+        when(teamUserRepository.existsById(new TeamUserId(10L, 1L)))
+                .thenReturn(false);
+        when(teamUserRepository.save(any(TeamUser.class)))
+                .thenReturn(expectedTeamUser);
+
+        teamService.join(1L, request);
+        ArgumentCaptor<TeamUser> teamUserCaptor = ArgumentCaptor.forClass(TeamUser.class);
+        verify(teamUserRepository).save(teamUserCaptor.capture());
+        TeamUser saved = teamUserCaptor.getValue();
+
+        assertEquals(10L, saved.getId().teamId());
+        assertEquals(1L, saved.getId().userId());
+        assertEquals(TeamRole.MEMBER, saved.getRole());
+    }
+
+    @Test
+    void join_コードが一致するチームがなければNotFoundExceptionが発生する() {
+        JoinTeamRequest request = new JoinTeamRequest("ABCD2345WXYZ");
+
+        when(teamCodeHasher.hash("ABCD2345WXYZ"))
+                .thenReturn("hashed");
+        when(teamRepository.findByCodeHash("hashed"))
+                .thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> teamService.join(1L, request));
+        verify(teamUserRepository, never()).existsById(any());
+        verify(teamUserRepository, never()).save(any());
+    }
+
+    @Test
+    void join_既に参加しているチームならConflictExceptionが発生する() {
+        JoinTeamRequest request = new JoinTeamRequest("ABCD2345WXYZ");
+        Team expectedTeam = new Team(1L, "hashed", "test_team", "test");
+        ReflectionTestUtils.setField(expectedTeam, "id", 10L);
+
+        when(teamCodeHasher.hash("ABCD2345WXYZ"))
+                .thenReturn("hashed");
+        when(teamRepository.findByCodeHash("hashed"))
+                .thenReturn(Optional.of(expectedTeam));
+        when(teamUserRepository.existsById(new TeamUserId(10L, 1L)))
+                .thenReturn(true);
+
+        assertThrows(ConflictException.class, () -> teamService.join(1L, request));
+        verify(teamUserRepository, never()).save(any());
     }
 
 }
