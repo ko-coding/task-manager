@@ -37,4 +37,16 @@ public interface TeamUserRepository extends JpaRepository<TeamUser, TeamUserId> 
             """)
     Optional<TeamMemberResponse> findMember(Long teamId, Long userId);
 
+    @Query(value = """
+            select new io.github.kocoding.taskmanager.team.dto.TeamMemberResponse(
+                tu.id.userId, u.name, tu.role, tu.createdAt)
+            from TeamUser tu join User u on tu.id.userId = u.id
+            where tu.id.teamId = :teamId
+            """, countQuery = """
+            select count(tu)
+            from TeamUser tu join User u on tu.id.userId = u.id
+            where tu.id.teamId = :teamId
+            """)
+    Page<TeamMemberResponse> findMembers(Long teamId, Pageable pageable);
+
 }

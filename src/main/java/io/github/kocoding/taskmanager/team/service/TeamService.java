@@ -31,6 +31,8 @@ public class TeamService {
 
     // 許可リスト(クライアントの名前 → JPQLの式)は定数で持つ
     private static final Map<String, String> TEAM_SORT_ALLOWLIST = Map.of("name", "t.name", "createdAt", "t.createdAt");
+    private static final Map<String, String> MEMBER_SORT_ALLOWLIST = Map.of("name", "u.name", "joinedAt",
+            "tu.createdAt");
 
     private final TeamRepository teamRepository;
     private final TeamUserRepository teamUserRepository;
@@ -96,6 +98,15 @@ public class TeamService {
 
         return teamUserRepository.findMember(teamId, targetUserId)
                 .orElseThrow(() -> new NotFoundException("メンバーが存在しません"));
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TeamMemberResponse> findMembers(Long userId, Long teamId, Pageable pageable) {
+        if (!teamUserRepository.existsById(new TeamUserId(teamId, userId))) {
+            throw new NotFoundException("チームが存在しません");
+        }
+        Pageable safePageable = toSafePageable(pageable, MEMBER_SORT_ALLOWLIST, "tu.createdAt", "tu.id.userId");
+        return teamUserRepository.findMembers(teamId, safePageable);
     }
 
     private Pageable toSafePageable(Pageable pageable, Map<String, String> allowList, String defaultSort,
