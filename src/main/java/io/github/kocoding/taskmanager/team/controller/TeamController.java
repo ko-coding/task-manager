@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import io.github.kocoding.taskmanager.team.dto.CreateTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamResponse;
+import io.github.kocoding.taskmanager.team.dto.JoinTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.TeamResponse;
 import io.github.kocoding.taskmanager.team.service.TeamService;
 import jakarta.validation.Valid;
@@ -47,6 +48,12 @@ public class TeamController {
     @GetMapping("/{teamId}")
     public ResponseEntity<TeamResponse> getTeam(@AuthenticationPrincipal Long userId, @PathVariable Long teamId) {
         return ResponseEntity.ok(teamService.findTeam(userId, teamId));
+    }
+
+    @PostMapping("/join")
+    public ResponseEntity<TeamResponse> joinTeam(@AuthenticationPrincipal Long userId,
+            @Valid @RequestBody JoinTeamRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(teamService.join(userId, request));
     }
 
 }
