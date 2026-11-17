@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,6 +29,7 @@ import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamResponse;
 import io.github.kocoding.taskmanager.team.dto.JoinTeamRequest;
+import io.github.kocoding.taskmanager.team.dto.TeamMemberResponse;
 import io.github.kocoding.taskmanager.team.dto.TeamResponse;
 import io.github.kocoding.taskmanager.team.entity.Team;
 import io.github.kocoding.taskmanager.team.entity.TeamRole;
@@ -248,6 +250,41 @@ public class TeamServiceTest {
 
         assertThrows(ConflictException.class, () -> teamService.join(1L, request));
         verify(teamUserRepository, never()).save(any());
+    }
+
+    @Test
+    void findMember_メンバーなら対象のメンバー情報が返る() {
+        when(teamUserRepository.existsById(new TeamUserId(10L, 1L)))
+                .thenReturn(true);
+        when(teamUserRepository.findMember(10L, 5L))
+                .thenReturn(Optional.of(new TeamMemberResponse(5L, "test", TeamRole.MEMBER, Instant.now())));
+
+        TeamMemberResponse response = teamService.findMember(1L, 10L, 5L);
+
+        assertEquals(5L, response.userId());
+        assertEquals("test", response.name());
+        assertEquals(TeamRole.MEMBER, response.role());
+    }
+
+    @Test
+    void findMember_本人がメンバーでない場合はNotFoundExceptionが発生する() {
+        when(teamUserRepository.existsById(new TeamUserId(10L, 1L)))
+                .thenReturn(false);
+
+        NotFoundException e = assertThrows(NotFoundException.class, () -> teamService.findMember(1L, 10L, 5L));
+        assertEquals("チームが存在しません", e.getMessage());
+        verify(teamUserRepository, never()).findMember(any(), any());
+    }
+
+    @Test
+    void findMember_対象メンバーがチームに存在しない場合はNotFoundExceptionが発生する() {
+        when(teamUserRepository.existsById(new TeamUserId(10L, 1L)))
+                .thenReturn(true);
+        when(teamUserRepository.findMember(10L, 5L))
+                .thenReturn(Optional.empty());
+
+        NotFoundException e = assertThrows(NotFoundException.class, () -> teamService.findMember(1L, 10L, 5L));
+        assertEquals("メンバーが存在しません", e.getMessage());
     }
 
 }
