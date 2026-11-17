@@ -1,5 +1,6 @@
 package io.github.kocoding.taskmanager.team.service;
 
+import java.util.Locale;
 import java.util.Map;
 
 import org.springframework.data.domain.Page;
@@ -11,9 +12,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import io.github.kocoding.taskmanager.common.exception.BadRequestException;
+import io.github.kocoding.taskmanager.common.exception.ConflictException;
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamResponse;
+import io.github.kocoding.taskmanager.team.dto.JoinTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.TeamResponse;
 import io.github.kocoding.taskmanager.team.entity.Team;
 import io.github.kocoding.taskmanager.team.entity.TeamRole;
@@ -64,6 +67,23 @@ public class TeamService {
                 .orElseThrow(() -> new NotFoundException(message));
         Team team = teamRepository.findById(teamId)
                 .orElseThrow(() -> new NotFoundException(message));
+        return TeamResponse.from(team, teamUser.getRole());
+    }
+
+    @Transactional
+    public TeamResponse join(Long userId, JoinTeamRequest request) {
+        String code = request.code().strip().toUpperCase(Locale.ROOT);
+        String codeHash = teamCodeHasher.hash(code);
+
+        Team team = teamRepository.findByCodeHash(codeHash)
+                .orElseThrow(() -> new NotFoundException("チームコードが正しくありません"));
+
+        if (teamUserRepository.existsById(new TeamUserId(team.getId(), userId))) {
+            // 参加済みならConflictException
+            throw new ConflictException("既に参加済みのチームです");
+        }
+
+        TeamUser teamUser = teamUserRepository.save(new TeamUser(team.getId(), userId, TeamRole.MEMBER));
         return TeamResponse.from(team, teamUser.getRole());
     }
 
