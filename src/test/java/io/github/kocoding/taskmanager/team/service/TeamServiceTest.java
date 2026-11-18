@@ -1,6 +1,7 @@
 package io.github.kocoding.taskmanager.team.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -25,12 +26,14 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import io.github.kocoding.taskmanager.common.exception.BadRequestException;
 import io.github.kocoding.taskmanager.common.exception.ConflictException;
+import io.github.kocoding.taskmanager.common.exception.ForbiddenException;
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamResponse;
 import io.github.kocoding.taskmanager.team.dto.JoinTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.TeamMemberResponse;
 import io.github.kocoding.taskmanager.team.dto.TeamResponse;
+import io.github.kocoding.taskmanager.team.dto.UpdateTeamRequest;
 import io.github.kocoding.taskmanager.team.entity.Team;
 import io.github.kocoding.taskmanager.team.entity.TeamRole;
 import io.github.kocoding.taskmanager.team.entity.TeamUser;
@@ -349,6 +352,102 @@ public class TeamServiceTest {
 
         assertEquals("tu.id.userId", orders.get(1).getProperty());
         assertEquals(Sort.Direction.ASC, orders.get(1).getDirection());
+    }
+
+    @Test
+    void update_nameだけ指定するとnameだけが変わる() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        UpdateTeamRequest request = new UpdateTeamRequest();
+        request.setName(Optional.of("renamed"));
+
+        when(teamUserRepository.findById(new TeamUserId(teamId, userId)))
+                .thenReturn(Optional.of(new TeamUser(teamId, userId, TeamRole.OWNER)));
+        when(teamRepository.findById(teamId))
+                .thenReturn(Optional.of(new Team(userId, "hashed", "test_team", "test")));
+
+        TeamResponse response = teamService.update(userId, teamId, request);
+
+        assertEquals("renamed", response.name());
+        assertEquals("test", response.description());
+    }
+
+    @Test
+    void update_descriptionだけ指定するとdescriptionだけが変わる() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        UpdateTeamRequest request = new UpdateTeamRequest();
+        request.setDescription(Optional.of("changed"));
+
+        when(teamUserRepository.findById(new TeamUserId(teamId, userId)))
+                .thenReturn(Optional.of(new TeamUser(teamId, userId, TeamRole.OWNER)));
+        when(teamRepository.findById(teamId))
+                .thenReturn(Optional.of(new Team(userId, "hashed", "test_team", "test")));
+
+        TeamResponse response = teamService.update(userId, teamId, request);
+
+        assertEquals("test_team", response.name());
+        assertEquals("changed", response.description());
+    }
+
+    @Test
+    void update_descriptionがOptional_emptyならdescriptionがnullになりnameは変わらない() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        UpdateTeamRequest request = new UpdateTeamRequest();
+        request.setDescription(Optional.empty());
+
+        when(teamUserRepository.findById(new TeamUserId(teamId, userId)))
+                .thenReturn(Optional.of(new TeamUser(teamId, userId, TeamRole.OWNER)));
+        when(teamRepository.findById(teamId))
+                .thenReturn(Optional.of(new Team(userId, "hashed", "test_team", "test")));
+
+        TeamResponse response = teamService.update(userId, teamId, request);
+
+        assertEquals("test_team", response.name());
+        assertNull(response.description());
+    }
+
+    @Test
+    void update_メンバーではない場合はNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        UpdateTeamRequest request = new UpdateTeamRequest();
+        request.setName(Optional.of("renamed"));
+
+        when(teamUserRepository.findById(new TeamUserId(teamId, userId)))
+                .thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> teamService.update(userId, teamId, request));
+        verify(teamRepository, never()).findById(any());
+    }
+
+    @Test
+    void update_メンバーだがOWNERでない場合はForbiddenExceptionが発生する() {
+        Long userId = 2L;
+        Long teamId = 10L;
+        UpdateTeamRequest request = new UpdateTeamRequest();
+        request.setName(Optional.of("renamed"));
+
+        when(teamUserRepository.findById(new TeamUserId(teamId, userId)))
+                .thenReturn(Optional.of(new TeamUser(teamId, userId, TeamRole.MEMBER)));
+
+        assertThrows(ForbiddenException.class, () -> teamService.update(userId, teamId, request));
+        verify(teamRepository, never()).findById(any());
+    }
+
+    @Test
+    void update_nameがOptional_emptyの場合はBadRequestExceptionが発生する() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        UpdateTeamRequest request = new UpdateTeamRequest();
+        request.setName(Optional.empty());
+
+        when(teamUserRepository.findById(new TeamUserId(teamId, userId)))
+                .thenReturn(Optional.of(new TeamUser(teamId, userId, TeamRole.OWNER)));
+
+        assertThrows(BadRequestException.class, () -> teamService.update(userId, teamId, request));
+        verify(teamRepository, never()).findById(any());
     }
 
 }
