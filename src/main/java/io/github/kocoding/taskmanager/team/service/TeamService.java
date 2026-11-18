@@ -13,12 +13,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import io.github.kocoding.taskmanager.common.exception.BadRequestException;
 import io.github.kocoding.taskmanager.common.exception.ConflictException;
+import io.github.kocoding.taskmanager.common.exception.ForbiddenException;
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamResponse;
 import io.github.kocoding.taskmanager.team.dto.JoinTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.TeamMemberResponse;
 import io.github.kocoding.taskmanager.team.dto.TeamResponse;
+import io.github.kocoding.taskmanager.team.dto.UpdateTeamRequest;
 import io.github.kocoding.taskmanager.team.entity.Team;
 import io.github.kocoding.taskmanager.team.entity.TeamRole;
 import io.github.kocoding.taskmanager.team.entity.TeamUser;
@@ -107,6 +109,33 @@ public class TeamService {
         }
         Pageable safePageable = toSafePageable(pageable, MEMBER_SORT_ALLOWLIST, "tu.createdAt", "tu.id.userId");
         return teamUserRepository.findMembers(teamId, safePageable);
+    }
+
+    @Transactional
+    public TeamResponse update(Long userId, Long teamId, UpdateTeamRequest request) {
+        TeamUser teamUser = teamUserRepository.findById(new TeamUserId(teamId, userId))
+                .orElseThrow(() -> new NotFoundException("チームが存在しません"));
+
+        if (teamUser.getRole() != TeamRole.OWNER) {
+            throw new ForbiddenException("チームを更新する権限がありません");
+        }
+
+        if (request.getName() != null && request.getName().isEmpty()) {
+            throw new BadRequestException("チーム名にnullは指定できません");
+        }
+
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new NotFoundException("チームが存在しません"));
+
+        if (request.getName() != null) {
+            team.rename(request.getName().get());
+        }
+
+        if (request.getDescription() != null) {
+            team.changeDescription(request.getDescription().orElse(null));
+        }
+
+        return TeamResponse.from(team, teamUser.getRole());
     }
 
     private Pageable toSafePageable(Pageable pageable, Map<String, String> allowList, String defaultSort,

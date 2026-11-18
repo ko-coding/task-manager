@@ -2,11 +2,14 @@ package io.github.kocoding.taskmanager.team.dto;
 
 import java.util.Optional;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
 // nullは省略、Optional.empty()はJSONのnull
 public class UpdateTeamRequest {
 
-    private Optional<String> name;
-    private Optional<String> description;
+    private Optional<@NotBlank @Size(max = 128) String> name;
+    private Optional<@Size(max = 255) String> description;
 
     public Optional<String> getName() {
         return name;
