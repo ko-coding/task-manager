@@ -20,6 +20,7 @@ import io.github.kocoding.taskmanager.team.dto.CreateTeamResponse;
 import io.github.kocoding.taskmanager.team.dto.JoinTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.TeamMemberResponse;
 import io.github.kocoding.taskmanager.team.dto.TeamResponse;
+import io.github.kocoding.taskmanager.team.dto.UpdateMemberRoleRequest;
 import io.github.kocoding.taskmanager.team.dto.UpdateTeamRequest;
 import io.github.kocoding.taskmanager.team.service.TeamService;
 import jakarta.validation.Valid;
@@ -76,6 +77,13 @@ public class TeamController {
     public ResponseEntity<TeamResponse> updateTeam(@AuthenticationPrincipal Long userId, @PathVariable Long teamId,
             @Valid @RequestBody UpdateTeamRequest request) {
         return ResponseEntity.ok(teamService.update(userId, teamId, request));
+    }
+
+    @PatchMapping("/{teamId}/members/{userId}/role")
+    public ResponseEntity<TeamMemberResponse> updateRole(@AuthenticationPrincipal Long userId,
+            @PathVariable Long teamId, @PathVariable("userId") Long targetUserId,
+            @Valid @RequestBody UpdateMemberRoleRequest request) {
+        return ResponseEntity.ok(teamService.updateRole(userId, teamId, targetUserId, request));
     }
 
 }
