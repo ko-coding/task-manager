@@ -287,4 +287,69 @@ public class TeamServiceTest {
         assertEquals("メンバーが存在しません", e.getMessage());
     }
 
+    @Test
+    void findMembers_本人がメンバーでない場合はNotFoundExceptionが発生する() {
+        when(teamUserRepository.existsById(new TeamUserId(10L, 1L)))
+                .thenReturn(false);
+
+        assertThrows(NotFoundException.class, () -> teamService.findMembers(1L, 10L, PageRequest.of(0, 20)));
+        verify(teamUserRepository, never()).findMembers(any(), any());
+    }
+
+    @Test
+    void findMembers_許可されていないsortならBadRequestExceptionになりRepositoryは呼ばれない() {
+        when(teamUserRepository.existsById(new TeamUserId(10L, 1L)))
+                .thenReturn(true);
+
+        assertThrows(BadRequestException.class,
+                () -> teamService.findMembers(1L, 10L, PageRequest.of(0, 20, Sort.by("foo"))));
+        verify(teamUserRepository, never()).findMembers(any(), any());
+    }
+
+    @Test
+    void findMembers_許可されたsortは置き換えられtu_id_userIdが最後に足される() {
+        when(teamUserRepository.existsById(new TeamUserId(10L, 1L)))
+                .thenReturn(true);
+
+        teamService.findMembers(1L, 10L, PageRequest.of(2, 10, Sort.by(Sort.Direction.DESC, "joinedAt")));
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(teamUserRepository).findMembers(eq(10L), pageableCaptor.capture());
+        Pageable passed = pageableCaptor.getValue();
+        List<Sort.Order> orders = passed.getSort().toList();
+
+        assertEquals(2, orders.size());
+        assertEquals(2, passed.getPageNumber());
+        assertEquals(10, passed.getPageSize());
+
+        assertEquals("tu.createdAt", orders.get(0).getProperty());
+        assertEquals(Sort.Direction.DESC, orders.get(0).getDirection());
+
+        assertEquals("tu.id.userId", orders.get(1).getProperty());
+        assertEquals(Sort.Direction.ASC, orders.get(1).getDirection());
+    }
+
+    @Test
+    void findMembers_sortの指定がなければtu_createdAtの昇順になりtu_id_userIdが最後に足される() {
+        when(teamUserRepository.existsById(new TeamUserId(10L, 1L)))
+                .thenReturn(true);
+
+        teamService.findMembers(1L, 10L, PageRequest.of(2, 10));
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(teamUserRepository).findMembers(eq(10L), pageableCaptor.capture());
+        Pageable passed = pageableCaptor.getValue();
+        List<Sort.Order> orders = passed.getSort().toList();
+
+        assertEquals(2, orders.size());
+        assertEquals(2, passed.getPageNumber());
+        assertEquals(10, passed.getPageSize());
+
+        assertEquals("tu.createdAt", orders.get(0).getProperty());
+        assertEquals(Sort.Direction.ASC, orders.get(0).getDirection());
+
+        assertEquals("tu.id.userId", orders.get(1).getProperty());
+        assertEquals(Sort.Direction.ASC, orders.get(1).getDirection());
+
+    }
+
 }
