@@ -349,7 +349,6 @@ public class TeamServiceTest {
 
         assertEquals("tu.id.userId", orders.get(1).getProperty());
         assertEquals(Sort.Direction.ASC, orders.get(1).getDirection());
-
     }
 
 }
