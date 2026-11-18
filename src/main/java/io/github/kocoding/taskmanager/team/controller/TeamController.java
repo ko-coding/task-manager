@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,6 +20,7 @@ import io.github.kocoding.taskmanager.team.dto.CreateTeamResponse;
 import io.github.kocoding.taskmanager.team.dto.JoinTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.TeamMemberResponse;
 import io.github.kocoding.taskmanager.team.dto.TeamResponse;
+import io.github.kocoding.taskmanager.team.dto.UpdateTeamRequest;
 import io.github.kocoding.taskmanager.team.service.TeamService;
 import jakarta.validation.Valid;
 
@@ -68,6 +70,12 @@ public class TeamController {
     public ResponseEntity<TeamMemberResponse> getMember(@AuthenticationPrincipal Long userId, @PathVariable Long teamId,
             @PathVariable("userId") Long targetUserId) {
         return ResponseEntity.ok(teamService.findMember(userId, teamId, targetUserId));
+    }
+
+    @PatchMapping("/{teamId}")
+    public ResponseEntity<TeamResponse> updateTeam(@AuthenticationPrincipal Long userId, @PathVariable Long teamId,
+            @Valid @RequestBody UpdateTeamRequest request) {
+        return ResponseEntity.ok(teamService.update(userId, teamId, request));
     }
 
 }
