@@ -20,6 +20,7 @@ import io.github.kocoding.taskmanager.team.dto.CreateTeamResponse;
 import io.github.kocoding.taskmanager.team.dto.JoinTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.TeamMemberResponse;
 import io.github.kocoding.taskmanager.team.dto.TeamResponse;
+import io.github.kocoding.taskmanager.team.dto.UpdateMemberRoleRequest;
 import io.github.kocoding.taskmanager.team.dto.UpdateTeamRequest;
 import io.github.kocoding.taskmanager.team.entity.Team;
 import io.github.kocoding.taskmanager.team.entity.TeamRole;
@@ -136,6 +137,32 @@ public class TeamService {
         }
 
         return TeamResponse.from(team, teamUser.getRole());
+    }
+
+    @Transactional
+    public TeamMemberResponse updateRole(Long userId, Long teamId, Long targetUserId, UpdateMemberRoleRequest request) {
+        TeamUser teamUser = teamUserRepository.findById(new TeamUserId(teamId, userId))
+                .orElseThrow(() -> new NotFoundException("チームが存在しません"));
+
+        if (teamUser.getRole() != TeamRole.OWNER) {
+            throw new ForbiddenException("ロールを更新する権限がありません");
+        }
+
+        if (request.role() != TeamRole.OWNER) {
+            throw new BadRequestException("OWNER以外は指定できません");
+        }
+
+        TeamUser target = teamUserRepository.findById(new TeamUserId(teamId, targetUserId))
+                .orElseThrow(() -> new NotFoundException("メンバーが存在しません"));
+
+        if (target.getRole() == TeamRole.OWNER) {
+            throw new ConflictException("既にOWNERです");
+        }
+
+        target.changeRole(request.role());
+
+        return teamUserRepository.findMember(teamId, targetUserId)
+                .orElseThrow(() -> new NotFoundException("メンバーが存在しません"));
     }
 
     private Pageable toSafePageable(Pageable pageable, Map<String, String> allowList, String defaultSort,

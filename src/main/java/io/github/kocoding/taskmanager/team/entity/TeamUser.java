@@ -27,6 +27,10 @@ public class TeamUser extends BaseTimeEntity {
         this.role = role;
     }
 
+    public void changeRole(TeamRole role) {
+        this.role = role;
+    }
+
     public TeamUserId getId() {
         return id;
     }
