@@ -23,6 +23,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.HttpClientErrorException.NotFound;
 
 import io.github.kocoding.taskmanager.common.exception.BadRequestException;
 import io.github.kocoding.taskmanager.common.exception.ConflictException;
@@ -33,6 +34,7 @@ import io.github.kocoding.taskmanager.team.dto.CreateTeamResponse;
 import io.github.kocoding.taskmanager.team.dto.JoinTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.TeamMemberResponse;
 import io.github.kocoding.taskmanager.team.dto.TeamResponse;
+import io.github.kocoding.taskmanager.team.dto.UpdateMemberRoleRequest;
 import io.github.kocoding.taskmanager.team.dto.UpdateTeamRequest;
 import io.github.kocoding.taskmanager.team.entity.Team;
 import io.github.kocoding.taskmanager.team.entity.TeamRole;
@@ -448,6 +450,113 @@ public class TeamServiceTest {
 
         assertThrows(BadRequestException.class, () -> teamService.update(userId, teamId, request));
         verify(teamRepository, never()).findById(any());
+    }
+
+    @Test
+    void updateRole_OWNERが対象のroleをOWNERにする() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        Long targetUserId = 5L;
+        UpdateMemberRoleRequest request = new UpdateMemberRoleRequest(TeamRole.OWNER);
+        TeamUser target = new TeamUser(teamId, targetUserId, TeamRole.MEMBER);
+
+        when(teamUserRepository.findById(new TeamUserId(teamId, userId)))
+                .thenReturn(Optional.of(new TeamUser(teamId, userId, TeamRole.OWNER)));
+        when(teamUserRepository.findById(new TeamUserId(teamId, targetUserId)))
+                .thenReturn(Optional.of(target));
+        when(teamUserRepository.findMember(teamId, targetUserId))
+                .thenReturn(Optional.of(new TeamMemberResponse(targetUserId, "test", TeamRole.OWNER, Instant.now())));
+
+        teamService.updateRole(userId, teamId, targetUserId, request);
+
+        assertEquals(TeamRole.OWNER, target.getRole());
+    }
+
+    @Test
+    void updateRole_本人がメンバーでない場合はNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        Long targetUserId = 5L;
+        UpdateMemberRoleRequest request = new UpdateMemberRoleRequest(TeamRole.OWNER);
+
+        when(teamUserRepository.findById(new TeamUserId(teamId, userId)))
+                .thenReturn(Optional.empty());
+
+        NotFoundException e = assertThrows(NotFoundException.class,
+                () -> teamService.updateRole(userId, teamId, targetUserId, request));
+        assertEquals("チームが存在しません", e.getMessage());
+        verify(teamUserRepository, never()).findById(new TeamUserId(teamId, targetUserId));
+        verify(teamUserRepository, never()).findMember(teamId, targetUserId);
+    }
+
+    @Test
+    void updateRole_本人がMEMBERの場合はForbiddenExceptionが発生する() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        Long targetUserId = 5L;
+        UpdateMemberRoleRequest request = new UpdateMemberRoleRequest(TeamRole.OWNER);
+
+        when(teamUserRepository.findById(new TeamUserId(teamId, userId)))
+                .thenReturn(Optional.of(new TeamUser(teamId, userId, TeamRole.MEMBER)));
+
+        ForbiddenException e = assertThrows(ForbiddenException.class,
+                () -> teamService.updateRole(userId, teamId, targetUserId, request));
+        assertEquals("ロールを更新する権限がありません", e.getMessage());
+        verify(teamUserRepository, never()).findById(new TeamUserId(teamId, targetUserId));
+        verify(teamUserRepository, never()).findMember(teamId, targetUserId);
+    }
+
+    @Test
+    void updateRole_roleとしてOWNER以外を指定した場合はBadRequestExceptionが発生する() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        Long targetUserId = 5L;
+        UpdateMemberRoleRequest request = new UpdateMemberRoleRequest(TeamRole.MEMBER);
+
+        when(teamUserRepository.findById(new TeamUserId(teamId, userId)))
+                .thenReturn(Optional.of(new TeamUser(teamId, userId, TeamRole.OWNER)));
+
+        BadRequestException e = assertThrows(BadRequestException.class,
+                () -> teamService.updateRole(userId, teamId, targetUserId, request));
+        assertEquals("OWNER以外は指定できません", e.getMessage());
+        verify(teamUserRepository, never()).findById(new TeamUserId(teamId, targetUserId));
+        verify(teamUserRepository, never()).findMember(teamId, targetUserId);
+    }
+
+    @Test
+    void updateRole_対象がメンバーではない場合はNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        Long targetUserId = 5L;
+        UpdateMemberRoleRequest request = new UpdateMemberRoleRequest(TeamRole.OWNER);
+
+        when(teamUserRepository.findById(new TeamUserId(teamId, userId)))
+                .thenReturn(Optional.of(new TeamUser(teamId, userId, TeamRole.OWNER)));
+        when(teamUserRepository.findById(new TeamUserId(teamId, targetUserId)))
+                .thenReturn(Optional.empty());
+
+        NotFoundException e = assertThrows(NotFoundException.class,
+                () -> teamService.updateRole(userId, teamId, targetUserId, request));
+        assertEquals("メンバーが存在しません", e.getMessage());
+        verify(teamUserRepository, never()).findMember(teamId, targetUserId);
+    }
+
+    @Test
+    void updateRole_対象が既にOWNERの場合はConflictExceptionが発生する() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        Long targetUserId = 5L;
+        UpdateMemberRoleRequest request = new UpdateMemberRoleRequest(TeamRole.OWNER);
+
+        when(teamUserRepository.findById(new TeamUserId(teamId, userId)))
+                .thenReturn(Optional.of(new TeamUser(teamId, userId, TeamRole.OWNER)));
+        when(teamUserRepository.findById(new TeamUserId(teamId, targetUserId)))
+                .thenReturn(Optional.of(new TeamUser(teamId, targetUserId, TeamRole.OWNER)));
+
+        ConflictException e = assertThrows(ConflictException.class,
+                () -> teamService.updateRole(userId, teamId, targetUserId, request));
+        assertEquals("既にOWNERです", e.getMessage());
+        verify(teamUserRepository, never()).findMember(teamId, targetUserId);
     }
 
 }
