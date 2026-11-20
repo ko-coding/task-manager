@@ -8,6 +8,7 @@ import io.github.kocoding.taskmanager.project.dto.CreateProjectRequest;
 import io.github.kocoding.taskmanager.project.dto.ProjectResponse;
 import io.github.kocoding.taskmanager.project.entity.Project;
 import io.github.kocoding.taskmanager.project.entity.ProjectUser;
+import io.github.kocoding.taskmanager.project.entity.ProjectUserId;
 import io.github.kocoding.taskmanager.project.repository.ProjectRepository;
 import io.github.kocoding.taskmanager.project.repository.ProjectUserRepository;
 import io.github.kocoding.taskmanager.team.entity.TeamUserId;
@@ -34,6 +35,17 @@ public class ProjectService {
         }
         Project project = projectRepository.save(new Project(teamId, userId, request.name(), request.description()));
         projectUserRepository.save(new ProjectUser(userId, project.getId(), teamId));
+        return ProjectResponse.from(project);
+    }
+
+    @Transactional(readOnly = true)
+    public ProjectResponse findProject(Long userId, Long projectId) {
+        String message = "プロジェクトが存在しません";
+        if (!projectUserRepository.existsById(new ProjectUserId(userId, projectId))) {
+            throw new NotFoundException(message);
+        }
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new NotFoundException(message));
         return ProjectResponse.from(project);
     }
 
