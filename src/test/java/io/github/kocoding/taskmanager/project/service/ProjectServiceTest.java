@@ -7,6 +7,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -17,6 +19,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.project.dto.CreateProjectRequest;
+import io.github.kocoding.taskmanager.project.dto.ProjectResponse;
 import io.github.kocoding.taskmanager.project.entity.Project;
 import io.github.kocoding.taskmanager.project.entity.ProjectUser;
 import io.github.kocoding.taskmanager.project.entity.ProjectUserId;
@@ -77,6 +80,39 @@ public class ProjectServiceTest {
         assertEquals("チームが存在しません", e.getMessage());
         verify(projectRepository, never()).save(any(Project.class));
         verify(projectUserRepository, never()).save(any(ProjectUser.class));
+    }
+
+    @Test
+    void findProject_メンバーならプロジェクトが返る() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        Long projectId = 20L;
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(true);
+        when(projectRepository.findById(projectId))
+                .thenReturn(Optional.of(new Project(teamId, 2L, "test", "test")));
+
+        ProjectResponse response = projectService.findProject(userId, projectId);
+
+        assertEquals(10L, response.teamId());
+        assertEquals(2L, response.createdBy());
+        assertEquals("test", response.name());
+        assertEquals("test", response.description());
+    }
+
+    @Test
+    void findProject_メンバーでなければNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long projectId = 20L;
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(false);
+
+        NotFoundException e = assertThrows(NotFoundException.class,
+                () -> projectService.findProject(userId, projectId));
+        assertEquals("プロジェクトが存在しません", e.getMessage());
+        verify(projectRepository, never()).findById(any());
     }
 
 }
