@@ -3,9 +3,12 @@ package io.github.kocoding.taskmanager.project.service;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import io.github.kocoding.taskmanager.common.exception.BadRequestException;
+import io.github.kocoding.taskmanager.common.exception.ForbiddenException;
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.project.dto.CreateProjectRequest;
 import io.github.kocoding.taskmanager.project.dto.ProjectResponse;
+import io.github.kocoding.taskmanager.project.dto.UpdateProjectRequest;
 import io.github.kocoding.taskmanager.project.entity.Project;
 import io.github.kocoding.taskmanager.project.entity.ProjectUser;
 import io.github.kocoding.taskmanager.project.entity.ProjectUserId;
@@ -46,6 +49,34 @@ public class ProjectService {
         }
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException(message));
+        return ProjectResponse.from(project);
+    }
+
+    @Transactional
+    public ProjectResponse updateProject(Long userId, Long projectId, UpdateProjectRequest request) {
+        if (!projectUserRepository.existsById(new ProjectUserId(userId, projectId))) {
+            throw new NotFoundException("プロジェクトが存在しません");
+        }
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new NotFoundException("プロジェクトが存在しません"));
+
+        if (!userId.equals(project.getCreatedBy())) {
+            throw new ForbiddenException("プロジェクトを更新する権限がありません");
+        }
+
+        if (request.getName() != null && request.getName().isEmpty()) {
+            throw new BadRequestException("プロジェクト名にnullは指定できません");
+        }
+
+        if (request.getName() != null) {
+            project.rename(request.getName().get());
+        }
+
+        if (request.getDescription() != null) {
+            project.changeDescription(request.getDescription().orElse(null));
+        }
+
         return ProjectResponse.from(project);
     }
 

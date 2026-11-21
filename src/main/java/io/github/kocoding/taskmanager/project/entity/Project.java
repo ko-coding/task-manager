@@ -38,6 +38,14 @@ public class Project extends BaseTimeEntity {
         this.description = description;
     }
 
+    public void rename(String name) {
+        this.name = name;
+    }
+
+    public void changeDescription(String description) {
+        this.description = description;
+    }
+
     public Long getId() {
         return id;
     }
