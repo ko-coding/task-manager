@@ -1,11 +1,16 @@
 package io.github.kocoding.taskmanager.project.service;
 
+import java.util.Map;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import io.github.kocoding.taskmanager.common.exception.BadRequestException;
 import io.github.kocoding.taskmanager.common.exception.ForbiddenException;
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
+import io.github.kocoding.taskmanager.common.query.QueryUtils;
 import io.github.kocoding.taskmanager.project.dto.CreateProjectRequest;
 import io.github.kocoding.taskmanager.project.dto.ProjectResponse;
 import io.github.kocoding.taskmanager.project.dto.UpdateProjectRequest;
@@ -19,6 +24,9 @@ import io.github.kocoding.taskmanager.team.repository.TeamUserRepository;
 
 @Service
 public class ProjectService {
+
+    private static final Map<String, String> PROJECT_SORT_ALLOWLIST = Map.of("name", "p.name", "createdAt",
+            "p.createdAt");
 
     private final ProjectUserRepository projectUserRepository;
     private final ProjectRepository projectRepository;
@@ -78,6 +86,13 @@ public class ProjectService {
         }
 
         return ProjectResponse.from(project);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ProjectResponse> findMyProjects(Long userId, String keyword, Pageable pageable) {
+        String pattern = QueryUtils.toLikePattern(keyword);
+        Pageable safePageable = QueryUtils.toSafePageable(pageable, PROJECT_SORT_ALLOWLIST, "p.name", "p.id");
+        return projectUserRepository.findProjects(userId, pattern, safePageable);
     }
 
 }
