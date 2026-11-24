@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.github.kocoding.taskmanager.project.dto.AddProjectMemberRequest;
 import io.github.kocoding.taskmanager.project.dto.CreateProjectRequest;
 import io.github.kocoding.taskmanager.project.dto.ProjectMemberResponse;
 import io.github.kocoding.taskmanager.project.dto.ProjectResponse;
@@ -67,6 +68,12 @@ public class ProjectController {
             @PathVariable Long projectId, Pageable pageable) {
         Page<ProjectMemberResponse> page = projectService.findMembers(userId, projectId, pageable);
         return new PagedModel<>(page);
+    }
+
+    @PostMapping("/api/projects/{projectId}/members")
+    public ResponseEntity<ProjectMemberResponse> addProjectMember(@AuthenticationPrincipal Long userId,
+            @PathVariable Long projectId, @Valid @RequestBody AddProjectMemberRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(projectService.addMember(userId, projectId, request));
     }
 
 }
