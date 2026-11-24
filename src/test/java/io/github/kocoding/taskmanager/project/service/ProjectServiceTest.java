@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,6 +16,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -298,6 +300,60 @@ public class ProjectServiceTest {
 
         assertEquals("p.id", orders.get(1).getProperty());
         assertEquals(Sort.Direction.ASC, orders.get(1).getDirection());
+    }
+
+    @Test
+    void deleteProject_作成者なら削除できる() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        Long projectId = 20L;
+        Project project = new Project(teamId, userId, "test", "test");
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(true);
+        when(projectRepository.findById(projectId))
+                .thenReturn(Optional.of(project));
+
+        projectService.deleteProject(userId, projectId);
+
+        InOrder inOrder = inOrder(projectUserRepository, projectRepository);
+        inOrder.verify(projectUserRepository).deleteByIdProjectId(projectId);
+        inOrder.verify(projectRepository).delete(project);
+    }
+
+    @Test
+    void deleteProject_メンバーでなければNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long projectId = 20L;
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(false);
+
+        NotFoundException e = assertThrows(NotFoundException.class,
+                () -> projectService.deleteProject(userId, projectId));
+        assertEquals("プロジェクトが存在しません", e.getMessage());
+        verify(projectRepository, never()).findById(projectId);
+        verify(projectUserRepository, never()).deleteByIdProjectId(projectId);
+        verify(projectRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteProject_作成者以外ならForbiddenExceptionが発生する() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        Long projectId = 20L;
+        Project project = new Project(teamId, 30L, "test", "test");
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(true);
+        when(projectRepository.findById(projectId))
+                .thenReturn(Optional.of(project));
+
+        ForbiddenException e = assertThrows(ForbiddenException.class,
+                () -> projectService.deleteProject(userId, projectId));
+        assertEquals("プロジェクトを削除する権限がありません", e.getMessage());
+        verify(projectUserRepository, never()).deleteByIdProjectId(projectId);
+        verify(projectRepository, never()).delete(project);
     }
 
 }
