@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,11 +25,15 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.HttpClientErrorException.Conflict;
 
 import io.github.kocoding.taskmanager.common.exception.BadRequestException;
+import io.github.kocoding.taskmanager.common.exception.ConflictException;
 import io.github.kocoding.taskmanager.common.exception.ForbiddenException;
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
+import io.github.kocoding.taskmanager.project.dto.AddProjectMemberRequest;
 import io.github.kocoding.taskmanager.project.dto.CreateProjectRequest;
+import io.github.kocoding.taskmanager.project.dto.ProjectMemberResponse;
 import io.github.kocoding.taskmanager.project.dto.ProjectResponse;
 import io.github.kocoding.taskmanager.project.dto.UpdateProjectRequest;
 import io.github.kocoding.taskmanager.project.entity.Project;
@@ -38,6 +43,8 @@ import io.github.kocoding.taskmanager.project.repository.ProjectRepository;
 import io.github.kocoding.taskmanager.project.repository.ProjectUserRepository;
 import io.github.kocoding.taskmanager.team.entity.TeamUserId;
 import io.github.kocoding.taskmanager.team.repository.TeamUserRepository;
+import io.github.kocoding.taskmanager.user.entity.User;
+import io.github.kocoding.taskmanager.user.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
 public class ProjectServiceTest {
@@ -50,6 +57,9 @@ public class ProjectServiceTest {
 
     @Mock
     private TeamUserRepository teamUserRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private ProjectService projectService;
@@ -405,6 +415,127 @@ public class ProjectServiceTest {
 
         assertEquals("pu.id.userId", orders.get(1).getProperty());
         assertEquals(Sort.Direction.ASC, orders.get(1).getDirection());
+    }
+
+    @Test
+    void addMember_作成者が追加すると保存され追加したメンバーが返る() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        Long projectId = 20L;
+        AddProjectMemberRequest request = new AddProjectMemberRequest(3L);
+        Project project = new Project(teamId, userId, "test", "test");
+        ProjectUser projectUser = new ProjectUser(request.userId(), projectId, teamId);
+        ReflectionTestUtils.setField(projectUser, "createdAt", Instant.parse("2026-01-01T00:00:00Z"));
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(true);
+        when(projectRepository.findById(projectId))
+                .thenReturn(Optional.of(project));
+        when(teamUserRepository.existsById(new TeamUserId(project.getTeamId(), request.userId())))
+                .thenReturn(true);
+        when(projectUserRepository.existsById(new ProjectUserId(request.userId(), projectId)))
+                .thenReturn(false);
+        when(projectUserRepository.save(any(ProjectUser.class)))
+                .thenReturn(projectUser);
+        when(userRepository.findById(request.userId()))
+                .thenReturn(Optional.of(new User("testuser", "test@example.com", "hashed")));
+
+        ProjectMemberResponse response = projectService.addMember(userId, projectId, request);
+
+        ArgumentCaptor<ProjectUser> projectUserCaptor = ArgumentCaptor.forClass(ProjectUser.class);
+        verify(projectUserRepository).save(projectUserCaptor.capture());
+        ProjectUser saved = projectUserCaptor.getValue();
+
+        assertEquals(new ProjectUserId(3L, 20L), saved.getId());
+        assertEquals(10L, saved.getTeamId());
+        assertEquals(3L, response.userId());
+        assertEquals("testuser", response.name());
+        assertEquals(Instant.parse("2026-01-01T00:00:00Z"), response.joinedAt());
+    }
+
+    @Test
+    void addMember_メンバーでなければNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long projectId = 20L;
+        AddProjectMemberRequest request = new AddProjectMemberRequest(3L);
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(false);
+
+        NotFoundException e = assertThrows(NotFoundException.class,
+                () -> projectService.addMember(userId, projectId, request));
+        assertEquals("プロジェクトが存在しません", e.getMessage());
+        verify(projectRepository, never()).findById(any());
+        verify(teamUserRepository, never()).existsById(any(TeamUserId.class));
+        verify(projectUserRepository).existsById(any(ProjectUserId.class));
+        verify(projectUserRepository, never()).save(any(ProjectUser.class));
+        verify(userRepository, never()).findById(any(Long.class));
+    }
+
+    @Test
+    void addMember_作成者以外が追加しようとするとForbiddenExceptionが発生する() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        Long projectId = 20L;
+        AddProjectMemberRequest request = new AddProjectMemberRequest(3L);
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(true);
+        when(projectRepository.findById(projectId))
+                .thenReturn(Optional.of(new Project(teamId, 100L, "test", "test")));
+
+        ForbiddenException e = assertThrows(ForbiddenException.class,
+                () -> projectService.addMember(userId, projectId, request));
+        assertEquals("プロジェクトメンバーを追加する権限がありません", e.getMessage());
+        verify(teamUserRepository, never()).existsById(any(TeamUserId.class));
+        verify(projectUserRepository).existsById(any(ProjectUserId.class));
+        verify(projectUserRepository, never()).save(any(ProjectUser.class));
+        verify(userRepository, never()).findById(any(Long.class));
+    }
+
+    @Test
+    void addMember_追加対象がチームにいなければNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        Long projectId = 20L;
+        AddProjectMemberRequest request = new AddProjectMemberRequest(3L);
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(true);
+        when(projectRepository.findById(projectId))
+                .thenReturn(Optional.of(new Project(teamId, userId, "test", "test")));
+        when(teamUserRepository.existsById(new TeamUserId(teamId, request.userId())))
+                .thenReturn(false);
+
+        NotFoundException e = assertThrows(NotFoundException.class,
+                () -> projectService.addMember(userId, projectId, request));
+        assertEquals("ユーザーが存在しません", e.getMessage());
+        verify(projectUserRepository).existsById(any(ProjectUserId.class));
+        verify(projectUserRepository, never()).save(any(ProjectUser.class));
+        verify(userRepository, never()).findById(any(Long.class));
+    }
+
+    @Test
+    void addMember_追加対象が既にメンバーならConflictExceptionが発生する() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        Long projectId = 20L;
+        AddProjectMemberRequest request = new AddProjectMemberRequest(3L);
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(true);
+        when(projectRepository.findById(projectId))
+                .thenReturn(Optional.of(new Project(teamId, userId, "test", "test")));
+        when(teamUserRepository.existsById(new TeamUserId(teamId, request.userId())))
+                .thenReturn(true);
+        when(projectUserRepository.existsById(new ProjectUserId(request.userId(), projectId)))
+                .thenReturn(true);
+
+        ConflictException e = assertThrows(ConflictException.class,
+                () -> projectService.addMember(userId, projectId, request));
+        assertEquals("このユーザーは既に参加しています", e.getMessage());
+        verify(projectUserRepository, never()).save(any(ProjectUser.class));
+        verify(userRepository, never()).findById(any(Long.class));
     }
 
 }
