@@ -25,4 +25,6 @@ public interface ProjectUserRepository extends JpaRepository<ProjectUser, Projec
             """)
     Page<ProjectResponse> findProjects(Long userId, String pattern, Pageable pageable);
 
+    void deleteByIdProjectId(Long projectId);
+
 }
