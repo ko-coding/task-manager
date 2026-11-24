@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import io.github.kocoding.taskmanager.project.dto.CreateProjectRequest;
+import io.github.kocoding.taskmanager.project.dto.ProjectMemberResponse;
 import io.github.kocoding.taskmanager.project.dto.ProjectResponse;
 import io.github.kocoding.taskmanager.project.dto.UpdateProjectRequest;
 import io.github.kocoding.taskmanager.project.service.ProjectService;
@@ -59,6 +60,13 @@ public class ProjectController {
     public ResponseEntity<Void> deleteProject(@AuthenticationPrincipal Long userId, @PathVariable Long projectId) {
         projectService.deleteProject(userId, projectId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/api/projects/{projectId}/members")
+    public PagedModel<ProjectMemberResponse> getMembers(@AuthenticationPrincipal Long userId,
+            @PathVariable Long projectId, Pageable pageable) {
+        Page<ProjectMemberResponse> page = projectService.findMembers(userId, projectId, pageable);
+        return new PagedModel<>(page);
     }
 
 }
