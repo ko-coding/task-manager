@@ -4,10 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -16,6 +18,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import io.github.kocoding.taskmanager.common.exception.BadRequestException;
@@ -230,6 +235,69 @@ public class ProjectServiceTest {
         BadRequestException e = assertThrows(BadRequestException.class,
                 () -> projectService.updateProject(userId, projectId, request));
         assertEquals("プロジェクト名にnullは指定できません", e.getMessage());
+    }
+
+    @Test
+    void findMyProjects_keywordの特殊文字はエスケープされて部分一致のパターンになる() {
+        projectService.findMyProjects(1L, "a_b%c\\d", PageRequest.of(0, 20));
+
+        ArgumentCaptor<String> patternCaptor = ArgumentCaptor.forClass(String.class);
+        verify(projectUserRepository).findProjects(eq(1L), patternCaptor.capture(), any(Pageable.class));
+
+        assertEquals("%a\\_b\\%c\\\\d%", patternCaptor.getValue());
+    }
+
+    @Test
+    void findMyProjects_許可されていないsortならBadRequestExceptionになりRepositoryは呼ばれない() {
+        Pageable pageable = PageRequest.of(0, 20, Sort.by("foo"));
+
+        assertThrows(BadRequestException.class, () -> projectService.findMyProjects(1L, null, pageable));
+
+        verify(projectUserRepository, never()).findProjects(any(), any(), any());
+    }
+
+    @Test
+    void findMyProjects_許可されたsortは置き換えられp_idが最後に足される() {
+        Pageable pageable = PageRequest.of(2, 10, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        projectService.findMyProjects(1L, null, pageable);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(projectUserRepository).findProjects(eq(1L), any(), pageableCaptor.capture());
+        Pageable passed = pageableCaptor.getValue();
+
+        List<Sort.Order> orders = passed.getSort().toList();
+        assertEquals(2, orders.size());
+        assertEquals(2, passed.getPageNumber());
+        assertEquals(10, passed.getPageSize());
+
+        assertEquals("p.createdAt", orders.get(0).getProperty());
+        assertEquals(Sort.Direction.DESC, orders.get(0).getDirection());
+
+        assertEquals("p.id", orders.get(1).getProperty());
+        assertEquals(Sort.Direction.ASC, orders.get(1).getDirection());
+    }
+
+    @Test
+    void findMyProjects_sortの指定がなければnameの昇順になりp_idが最後に足される() {
+        Pageable pageable = PageRequest.of(2, 10);
+
+        projectService.findMyProjects(1L, null, pageable);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(projectUserRepository).findProjects(eq(1L), any(), pageableCaptor.capture());
+        Pageable passed = pageableCaptor.getValue();
+        List<Sort.Order> orders = passed.getSort().toList();
+
+        assertEquals(2, orders.size());
+        assertEquals(2, passed.getPageNumber());
+        assertEquals(10, passed.getPageSize());
+
+        assertEquals("p.name", orders.get(0).getProperty());
+        assertEquals(Sort.Direction.ASC, orders.get(0).getDirection());
+
+        assertEquals("p.id", orders.get(1).getProperty());
+        assertEquals(Sort.Direction.ASC, orders.get(1).getDirection());
     }
 
 }
