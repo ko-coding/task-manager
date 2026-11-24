@@ -12,6 +12,7 @@ import io.github.kocoding.taskmanager.common.exception.ForbiddenException;
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.common.query.QueryUtils;
 import io.github.kocoding.taskmanager.project.dto.CreateProjectRequest;
+import io.github.kocoding.taskmanager.project.dto.ProjectMemberResponse;
 import io.github.kocoding.taskmanager.project.dto.ProjectResponse;
 import io.github.kocoding.taskmanager.project.dto.UpdateProjectRequest;
 import io.github.kocoding.taskmanager.project.entity.Project;
@@ -27,6 +28,8 @@ public class ProjectService {
 
     private static final Map<String, String> PROJECT_SORT_ALLOWLIST = Map.of("name", "p.name", "createdAt",
             "p.createdAt");
+    private static final Map<String, String> MEMBER_SORT_ALLOWLIST = Map.of("name", "u.name", "joinedAt",
+            "pu.createdAt");
 
     private final ProjectUserRepository projectUserRepository;
     private final ProjectRepository projectRepository;
@@ -111,6 +114,17 @@ public class ProjectService {
         // TODO: tasksができたら、project_usersより先にタスクを削除する
         projectUserRepository.deleteByIdProjectId(projectId);
         projectRepository.delete(project);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ProjectMemberResponse> findMembers(Long userId, Long projectId, Pageable pageable) {
+        if (!projectUserRepository.existsById(new ProjectUserId(userId, projectId))) {
+            throw new NotFoundException("プロジェクトが存在しません");
+        }
+
+        Pageable safePageable = QueryUtils.toSafePageable(pageable, MEMBER_SORT_ALLOWLIST, "pu.createdAt",
+                "pu.id.userId");
+        return projectUserRepository.findMembers(projectId, safePageable);
     }
 
 }
