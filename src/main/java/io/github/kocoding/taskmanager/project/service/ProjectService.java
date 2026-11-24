@@ -95,4 +95,22 @@ public class ProjectService {
         return projectUserRepository.findProjects(userId, pattern, safePageable);
     }
 
+    @Transactional
+    public void deleteProject(Long userId, Long projectId) {
+        if (!projectUserRepository.existsById(new ProjectUserId(userId, projectId))) {
+            throw new NotFoundException("プロジェクトが存在しません");
+        }
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new NotFoundException("プロジェクトが存在しません"));
+
+        if (!userId.equals(project.getCreatedBy())) {
+            throw new ForbiddenException("プロジェクトを削除する権限がありません");
+        }
+
+        // TODO: tasksができたら、project_usersより先にタスクを削除する
+        projectUserRepository.deleteByIdProjectId(projectId);
+        projectRepository.delete(project);
+    }
+
 }
