@@ -25,7 +25,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.client.HttpClientErrorException.Conflict;
 
 import io.github.kocoding.taskmanager.common.exception.BadRequestException;
 import io.github.kocoding.taskmanager.common.exception.ConflictException;
