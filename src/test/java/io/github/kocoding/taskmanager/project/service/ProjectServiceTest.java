@@ -356,4 +356,55 @@ public class ProjectServiceTest {
         verify(projectRepository, never()).delete(project);
     }
 
+    @Test
+    void findMembers_メンバーでなければNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long projectId = 20L;
+        Pageable pageable = PageRequest.of(0, 20);
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(false);
+
+        NotFoundException e = assertThrows(NotFoundException.class,
+                () -> projectService.findMembers(userId, projectId, pageable));
+        assertEquals("プロジェクトが存在しません", e.getMessage());
+        verify(projectUserRepository, never()).findMembers(any(), any());
+    }
+
+    @Test
+    void findMembers_許可されていないsortならBadRequestExceptionになりRepositoryは呼ばれない() {
+        Pageable pageable = PageRequest.of(0, 20, Sort.by("foo"));
+
+        when(projectUserRepository.existsById(new ProjectUserId(1L, 20L)))
+                .thenReturn(true);
+
+        assertThrows(BadRequestException.class, () -> projectService.findMembers(1L, 20L, pageable));
+        verify(projectUserRepository, never()).findMembers(any(), any());
+    }
+
+    @Test
+    void findMembers_許可されたsortは置き換えられpu_id_userIdが最後に足される() {
+        Pageable pageable = PageRequest.of(2, 10, Sort.by(Sort.Direction.DESC, "joinedAt"));
+
+        when(projectUserRepository.existsById(new ProjectUserId(1L, 20L)))
+                .thenReturn(true);
+
+        projectService.findMembers(1L, 20L, pageable);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(projectUserRepository).findMembers(eq(20L), pageableCaptor.capture());
+        Pageable passed = pageableCaptor.getValue();
+
+        List<Sort.Order> orders = passed.getSort().toList();
+        assertEquals(2, orders.size());
+        assertEquals(2, passed.getPageNumber());
+        assertEquals(10, passed.getPageSize());
+
+        assertEquals("pu.createdAt", orders.get(0).getProperty());
+        assertEquals(Sort.Direction.DESC, orders.get(0).getDirection());
+
+        assertEquals("pu.id.userId", orders.get(1).getProperty());
+        assertEquals(Sort.Direction.ASC, orders.get(1).getDirection());
+    }
+
 }
