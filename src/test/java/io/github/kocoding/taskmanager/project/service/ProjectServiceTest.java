@@ -30,6 +30,7 @@ import io.github.kocoding.taskmanager.common.exception.BadRequestException;
 import io.github.kocoding.taskmanager.common.exception.ConflictException;
 import io.github.kocoding.taskmanager.common.exception.ForbiddenException;
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
+import io.github.kocoding.taskmanager.common.exception.UnprocessableContentException;
 import io.github.kocoding.taskmanager.project.dto.AddProjectMemberRequest;
 import io.github.kocoding.taskmanager.project.dto.CreateProjectRequest;
 import io.github.kocoding.taskmanager.project.dto.ProjectMemberResponse;
@@ -535,6 +536,100 @@ public class ProjectServiceTest {
         assertEquals("このユーザーは既に参加しています", e.getMessage());
         verify(projectUserRepository, never()).save(any(ProjectUser.class));
         verify(userRepository, never()).findById(any(Long.class));
+    }
+
+    @Test
+    void removeMember_作成者ならメンバーを削除できる() {
+        Long userId = 1L;
+        Long targetUserId = 3L;
+        Long teamId = 10L;
+        Long projectId = 20L;
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(true);
+        when(projectRepository.findById(projectId))
+                .thenReturn(Optional.of(new Project(teamId, userId, "test", "test")));
+        when(projectUserRepository.existsById(new ProjectUserId(targetUserId, projectId)))
+                .thenReturn(true);
+
+        projectService.removeMember(userId, projectId, targetUserId);
+
+        verify(projectUserRepository).deleteById(new ProjectUserId(3L, 20L));
+    }
+
+    @Test
+    void removeMember_メンバーでなければNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long targetUserId = 3L;
+        Long projectId = 20L;
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(false);
+
+        NotFoundException e = assertThrows(NotFoundException.class,
+                () -> projectService.removeMember(userId, projectId, targetUserId));
+        assertEquals("プロジェクトが存在しません", e.getMessage());
+        verify(projectRepository, never()).findById(projectId);
+        verify(projectUserRepository, never()).existsById(new ProjectUserId(targetUserId, projectId));
+        verify(projectUserRepository, never()).deleteById(any(ProjectUserId.class));
+    }
+
+    @Test
+    void removeMember_作成者でなければForbiddenExceptionが発生する() {
+        Long userId = 1L;
+        Long targetUserId = 3L;
+        Long teamId = 10L;
+        Long projectId = 20L;
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(true);
+        when(projectRepository.findById(projectId))
+                .thenReturn(Optional.of(new Project(teamId, 100L, "test", "test")));
+
+        ForbiddenException e = assertThrows(ForbiddenException.class,
+                () -> projectService.removeMember(userId, projectId, targetUserId));
+        assertEquals("プロジェクトメンバーを削除する権限がありません", e.getMessage());
+        verify(projectUserRepository, never()).existsById(new ProjectUserId(targetUserId, projectId));
+        verify(projectUserRepository, never()).deleteById(any(ProjectUserId.class));
+    }
+
+    @Test
+    void removeMember_作成者自身を削除しようとするとUnprocessableContentExceptionが発生する() {
+        Long userId = 1L;
+        Long targetUserId = 1L;
+        Long teamId = 10L;
+        Long projectId = 20L;
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(true);
+        when(projectRepository.findById(projectId))
+                .thenReturn(Optional.of(new Project(teamId, userId, "test", "test")));
+
+        UnprocessableContentException e = assertThrows(UnprocessableContentException.class,
+                () -> projectService.removeMember(userId, projectId, targetUserId));
+        assertEquals("作成者はプロジェクトから削除できません", e.getMessage());
+        verify(projectUserRepository).existsById(any(ProjectUserId.class));
+        verify(projectUserRepository, never()).deleteById(any(ProjectUserId.class));
+    }
+
+    @Test
+    void removeMember_対象がメンバーでない場合はNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long targetUserId = 3L;
+        Long teamId = 10L;
+        Long projectId = 20L;
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(true);
+        when(projectRepository.findById(projectId))
+                .thenReturn(Optional.of(new Project(teamId, userId, "test", "test")));
+        when(projectUserRepository.existsById(new ProjectUserId(targetUserId, projectId)))
+                .thenReturn(false);
+
+        NotFoundException e = assertThrows(NotFoundException.class,
+                () -> projectService.removeMember(userId, projectId, targetUserId));
+        assertEquals("メンバーが存在しません", e.getMessage());
+        verify(projectUserRepository, never()).deleteById(any(ProjectUserId.class));
     }
 
 }
