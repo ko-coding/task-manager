@@ -76,4 +76,12 @@ public class ProjectController {
         return ResponseEntity.status(HttpStatus.CREATED).body(projectService.addMember(userId, projectId, request));
     }
 
+    @DeleteMapping("/api/projects/{projectId}/members/{userId}")
+    public ResponseEntity<Void> deleteMember(@AuthenticationPrincipal Long userId,
+            @PathVariable Long projectId,
+            @PathVariable("userId") Long targetUserId) {
+        projectService.removeMember(userId, projectId, targetUserId);
+        return ResponseEntity.noContent().build();
+    }
+
 }
