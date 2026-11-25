@@ -68,4 +68,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(body);
     }
 
+    @ExceptionHandler(UnprocessableContentException.class)
+    public ResponseEntity<ErrorResponse> handleUnprocessableContent(UnprocessableContentException e) {
+        int status = HttpStatus.UNPROCESSABLE_CONTENT.value();
+        ErrorResponse body = new ErrorResponse(status, e.getMessage());
+        return ResponseEntity.status(status).body(body);
+    }
+
 }
