@@ -11,6 +11,7 @@ import io.github.kocoding.taskmanager.common.exception.BadRequestException;
 import io.github.kocoding.taskmanager.common.exception.ConflictException;
 import io.github.kocoding.taskmanager.common.exception.ForbiddenException;
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
+import io.github.kocoding.taskmanager.common.exception.UnprocessableContentException;
 import io.github.kocoding.taskmanager.common.query.QueryUtils;
 import io.github.kocoding.taskmanager.project.dto.AddProjectMemberRequest;
 import io.github.kocoding.taskmanager.project.dto.CreateProjectRequest;
@@ -162,6 +163,32 @@ public class ProjectService {
                 .orElseThrow(() -> new NotFoundException("ユーザーが存在しません"));
 
         return new ProjectMemberResponse(targetUserId, user.getName(), projectUser.getCreatedAt());
+    }
+
+    @Transactional
+    public void removeMember(Long userId, Long projectId, Long targetUserId) {
+        if (!projectUserRepository.existsById(new ProjectUserId(userId, projectId))) {
+            throw new NotFoundException("プロジェクトが存在しません");
+        }
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new NotFoundException("プロジェクトが存在しません"));
+
+        if (!userId.equals(project.getCreatedBy())) {
+            throw new ForbiddenException("プロジェクトメンバーを削除する権限がありません");
+        }
+
+        if (targetUserId.equals(project.getCreatedBy())) {
+            throw new UnprocessableContentException("作成者はプロジェクトから削除できません");
+        }
+
+        if (!projectUserRepository.existsById(new ProjectUserId(targetUserId, projectId))) {
+            throw new NotFoundException("メンバーが存在しません");
+        }
+
+        // TODO: 担当タスクの assigned_to = NULL（tasks ができてから。）
+
+        projectUserRepository.deleteById(new ProjectUserId(targetUserId, projectId));
     }
 
 }
