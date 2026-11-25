@@ -41,4 +41,16 @@ public class TaskService {
         return TaskResponse.from(taskRepository.save(task));
     }
 
+    @Transactional(readOnly = true)
+    public TaskResponse findTask(Long userId, Long taskId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException("タスクが存在しません"));
+
+        if (!projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId()))) {
+            throw new NotFoundException("タスクが存在しません");
+        }
+
+        return TaskResponse.from(task);
+    }
+
 }
