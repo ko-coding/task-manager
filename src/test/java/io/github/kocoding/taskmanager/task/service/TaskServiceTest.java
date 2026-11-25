@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.common.exception.UnprocessableContentException;
@@ -123,6 +125,52 @@ public class TaskServiceTest {
                 () -> taskService.create(userId, projectId, request));
         assertEquals("担当者はプロジェクトのメンバーである必要があります", e.getMessage());
         verify(taskRepository, never()).save(any(Task.class));
+    }
+
+    @Test
+    void findTask_メンバーでタスクが存在する場合はそのタスクが返る() {
+        Long userId = 1L;
+        Long projectId = 20L;
+        Long taskId = 50L;
+        Task task = new Task(projectId, 100L, 2L, "title", "description", TaskStatus.TODO,
+                LocalDate.of(2026, 1, 1));
+        ReflectionTestUtils.setField(task, "id", 50L);
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(task));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(true);
+
+        TaskResponse response = taskService.findTask(userId, taskId);
+
+        assertEquals(50L, response.id());
+        assertEquals("title", response.title());
+    }
+
+    @Test
+    void findTask_タスクが存在しない場合はNotFoundExceptionが発生する() {
+        when(taskRepository.findById(50L))
+                .thenReturn(Optional.empty());
+
+        NotFoundException e = assertThrows(NotFoundException.class, () -> taskService.findTask(1L, 50L));
+        assertEquals("タスクが存在しません", e.getMessage());
+        verify(projectUserRepository, never()).existsById(any(ProjectUserId.class));
+    }
+
+    @Test
+    void findTask_メンバーでない場合はNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long taskId = 50L;
+        Task task = new Task(500L, 100L, 2L, "title", "description", TaskStatus.TODO,
+                LocalDate.of(2026, 1, 1));
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(task));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId())))
+                .thenReturn(false);
+
+        NotFoundException e = assertThrows(NotFoundException.class, () -> taskService.findTask(userId, taskId));
+        assertEquals("タスクが存在しません", e.getMessage());
     }
 
 }
