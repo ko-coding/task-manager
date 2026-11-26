@@ -21,8 +21,8 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
                 and (:status is null or t.status = :status)
                 and (:assignedTo is null or t.assignedTo = :assignedTo)
                 and lower(t.title) like lower(:pattern) escape '\\'
-                and (:dueDateFrom is null or t.dueDate >= :dueDateFrom)
-                and (:dueDateTo is null or t.dueDate <= :dueDateTo)
+                and (cast(:dueDateFrom as LocalDate) is null or t.dueDate >= :dueDateFrom)
+                and (cast(:dueDateTo as LocalDate) is null or t.dueDate <= :dueDateTo)
             """, countQuery = """
             select count(t)
             from Task t
@@ -30,8 +30,8 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
                 and (:status is null or t.status = :status)
                 and (:assignedTo is null or t.assignedTo = :assignedTo)
                 and lower(t.title) like lower(:pattern) escape '\\'
-                and (:dueDateFrom is null or t.dueDate >= :dueDateFrom)
-                and (:dueDateTo is null or t.dueDate <= :dueDateTo)
+                and (cast(:dueDateFrom as LocalDate) is null or t.dueDate >= :dueDateFrom)
+                and (cast(:dueDateTo as LocalDate) is null or t.dueDate <= :dueDateTo)
             """)
     Page<TaskResponse> findTasks(Long projectId, TaskStatus status, Long assignedTo, String pattern,
             LocalDate dueDateFrom, LocalDate dueDateTo, Pageable pageable);
