@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import io.github.kocoding.taskmanager.common.exception.BadRequestException;
+import io.github.kocoding.taskmanager.common.exception.ForbiddenException;
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.common.exception.UnprocessableContentException;
 import io.github.kocoding.taskmanager.common.query.QueryUtils;
@@ -17,6 +18,7 @@ import io.github.kocoding.taskmanager.project.entity.ProjectUserId;
 import io.github.kocoding.taskmanager.project.repository.ProjectUserRepository;
 import io.github.kocoding.taskmanager.task.dto.CreateTaskRequest;
 import io.github.kocoding.taskmanager.task.dto.TaskResponse;
+import io.github.kocoding.taskmanager.task.dto.UpdateTaskRequest;
 import io.github.kocoding.taskmanager.task.entity.Task;
 import io.github.kocoding.taskmanager.task.entity.TaskStatus;
 import io.github.kocoding.taskmanager.task.repository.TaskRepository;
@@ -79,6 +81,47 @@ public class TaskService {
         Pageable safePageable = QueryUtils.toSafePageable(pageable, TASK_SORT_ALLOWLIST, "t.createdAt",
                 Sort.Direction.DESC, "t.id");
         return taskRepository.findTasks(projectId, status, assignedTo, pattern, dueDateFrom, dueDateTo, safePageable);
+    }
+
+    @Transactional
+    public TaskResponse updateTask(Long userId, Long taskId, UpdateTaskRequest request) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException("タスクが存在しません"));
+
+        if (!projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId()))) {
+            throw new NotFoundException("タスクが存在しません");
+        }
+
+        if (!userId.equals(task.getCreatedBy())) {
+            throw new ForbiddenException("タスクを更新する権限がありません");
+        }
+
+        if (request.getTitle() != null && request.getTitle().isEmpty()) {
+            throw new BadRequestException("タスク名にnullは指定できません");
+        }
+
+        if (request.getAssignedTo() != null && request.getAssignedTo().isPresent() && !projectUserRepository
+                .existsById(new ProjectUserId(request.getAssignedTo().get(), task.getProjectId()))) {
+            throw new UnprocessableContentException("担当者はプロジェクトのメンバーである必要があります");
+        }
+
+        if (request.getTitle() != null) {
+            task.changeTitle(request.getTitle().get());
+        }
+
+        if (request.getDescription() != null) {
+            task.changeDescription(request.getDescription().orElse(null));
+        }
+
+        if (request.getDueDate() != null) {
+            task.changeDueDate(request.getDueDate().orElse(null));
+        }
+
+        if (request.getAssignedTo() != null) {
+            task.changeAssignedTo(request.getAssignedTo().orElse(null));
+        }
+
+        return TaskResponse.from(task);
     }
 
 }

@@ -56,6 +56,22 @@ public class Task extends BaseTimeEntity {
         this.dueDate = dueDate;
     }
 
+    public void changeTitle(String title) {
+        this.title = title;
+    }
+
+    public void changeDescription(String description) {
+        this.description = description;
+    }
+
+    public void changeDueDate(LocalDate dueDate) {
+        this.dueDate = dueDate;
+    }
+
+    public void changeAssignedTo(Long assignedTo) {
+        this.assignedTo = assignedTo;
+    }
+
     public Long getId() {
         return id;
     }
