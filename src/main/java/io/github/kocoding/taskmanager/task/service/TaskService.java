@@ -1,10 +1,18 @@
 package io.github.kocoding.taskmanager.task.service;
 
+import java.time.LocalDate;
+import java.util.Map;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import io.github.kocoding.taskmanager.common.exception.BadRequestException;
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.common.exception.UnprocessableContentException;
+import io.github.kocoding.taskmanager.common.query.QueryUtils;
 import io.github.kocoding.taskmanager.project.entity.ProjectUserId;
 import io.github.kocoding.taskmanager.project.repository.ProjectUserRepository;
 import io.github.kocoding.taskmanager.task.dto.CreateTaskRequest;
@@ -15,6 +23,9 @@ import io.github.kocoding.taskmanager.task.repository.TaskRepository;
 
 @Service
 public class TaskService {
+
+    private static final Map<String, String> TASK_SORT_ALLOWLIST = Map.of("dueDate", "t.dueDate", "createdAt",
+            "t.createdAt");
 
     private final TaskRepository taskRepository;
     private final ProjectUserRepository projectUserRepository;
@@ -51,6 +62,23 @@ public class TaskService {
         }
 
         return TaskResponse.from(task);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TaskResponse> findTasks(Long userId, Long projectId, TaskStatus status, Long assignedTo, String keyword,
+            LocalDate dueDateFrom, LocalDate dueDateTo, Pageable pageable) {
+        if (!projectUserRepository.existsById(new ProjectUserId(userId, projectId))) {
+            throw new NotFoundException("プロジェクトが存在しません");
+        }
+
+        if (dueDateFrom != null && dueDateTo != null && dueDateFrom.isAfter(dueDateTo)) {
+            throw new BadRequestException("期間の指定が正しくありません");
+        }
+
+        String pattern = QueryUtils.toLikePattern(keyword);
+        Pageable safePageable = QueryUtils.toSafePageable(pageable, TASK_SORT_ALLOWLIST, "t.createdAt",
+                Sort.Direction.DESC, "t.id");
+        return taskRepository.findTasks(projectId, status, assignedTo, pattern, dueDateFrom, dueDateTo, safePageable);
     }
 
 }
