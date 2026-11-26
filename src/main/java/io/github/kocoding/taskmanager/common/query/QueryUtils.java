@@ -15,7 +15,7 @@ public final class QueryUtils {
     }
 
     public static Pageable toSafePageable(Pageable pageable, Map<String, String> allowList, String defaultSort,
-            String tieBreaker) {
+            Sort.Direction defaultDirection, String tieBreaker) {
         Sort safeSort = Sort.unsorted();
         Sort sort = pageable.getSort();
 
@@ -29,9 +29,9 @@ public final class QueryUtils {
             safeSort = safeSort.and(JpaSort.unsafe(order.getDirection(), allowList.get(order.getProperty())));
         }
 
-        // 3. sortの指定がなければ defaultSort の昇順
+        // 3. sortの指定がなければ defaultSort を defaultDirectionの向き
         if (safeSort.isUnsorted()) {
-            safeSort = safeSort.and(JpaSort.unsafe(Sort.Direction.ASC, defaultSort));
+            safeSort = safeSort.and(JpaSort.unsafe(defaultDirection, defaultSort));
         }
 
         // 4. 最後に tieBreaker の昇順を必ず足す

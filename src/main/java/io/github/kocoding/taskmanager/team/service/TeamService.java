@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,7 +61,8 @@ public class TeamService {
     @Transactional(readOnly = true)
     public Page<TeamResponse> findMyTeams(Long userId, String keyword, Pageable pageable) {
         String pattern = QueryUtils.toLikePattern(keyword);
-        Pageable safePageable = QueryUtils.toSafePageable(pageable, TEAM_SORT_ALLOWLIST, "t.name", "t.id");
+        Pageable safePageable = QueryUtils.toSafePageable(pageable, TEAM_SORT_ALLOWLIST, "t.name", Sort.Direction.ASC,
+                "t.id");
         return teamUserRepository.findTeams(userId, pattern, safePageable);
     }
 
@@ -107,7 +109,7 @@ public class TeamService {
             throw new NotFoundException("チームが存在しません");
         }
         Pageable safePageable = QueryUtils.toSafePageable(pageable, MEMBER_SORT_ALLOWLIST, "tu.createdAt",
-                "tu.id.userId");
+                Sort.Direction.ASC, "tu.id.userId");
         return teamUserRepository.findMembers(teamId, safePageable);
     }
 

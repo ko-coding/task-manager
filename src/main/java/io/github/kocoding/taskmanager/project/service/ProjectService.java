@@ -4,6 +4,7 @@ import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -101,7 +102,8 @@ public class ProjectService {
     @Transactional(readOnly = true)
     public Page<ProjectResponse> findMyProjects(Long userId, String keyword, Pageable pageable) {
         String pattern = QueryUtils.toLikePattern(keyword);
-        Pageable safePageable = QueryUtils.toSafePageable(pageable, PROJECT_SORT_ALLOWLIST, "p.name", "p.id");
+        Pageable safePageable = QueryUtils.toSafePageable(pageable, PROJECT_SORT_ALLOWLIST, "p.name",
+                Sort.Direction.ASC, "p.id");
         return projectUserRepository.findProjects(userId, pattern, safePageable);
     }
 
@@ -130,7 +132,7 @@ public class ProjectService {
         }
 
         Pageable safePageable = QueryUtils.toSafePageable(pageable, MEMBER_SORT_ALLOWLIST, "pu.createdAt",
-                "pu.id.userId");
+                Sort.Direction.ASC, "pu.id.userId");
         return projectUserRepository.findMembers(projectId, safePageable);
     }
 
