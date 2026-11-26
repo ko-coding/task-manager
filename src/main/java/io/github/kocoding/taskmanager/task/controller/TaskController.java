@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import io.github.kocoding.taskmanager.task.dto.CreateTaskRequest;
 import io.github.kocoding.taskmanager.task.dto.TaskResponse;
+import io.github.kocoding.taskmanager.task.dto.UpdateTaskRequest;
 import io.github.kocoding.taskmanager.task.entity.TaskStatus;
 import io.github.kocoding.taskmanager.task.service.TaskService;
 import jakarta.validation.Valid;
@@ -49,6 +51,12 @@ public class TaskController {
         Page<TaskResponse> page = taskService.findTasks(userId, projectId, status, assignedTo, keyword, dueDateFrom,
                 dueDateTo, pageable);
         return new PagedModel<>(page);
+    }
+
+    @PatchMapping("/api/tasks/{taskId}")
+    public ResponseEntity<TaskResponse> updateTask(@AuthenticationPrincipal Long userId, @PathVariable Long taskId,
+            @Valid @RequestBody UpdateTaskRequest request) {
+        return ResponseEntity.ok(taskService.updateTask(userId, taskId, request));
     }
 
 }
