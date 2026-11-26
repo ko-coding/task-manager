@@ -2,13 +2,16 @@ package io.github.kocoding.taskmanager.task.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -17,8 +20,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import io.github.kocoding.taskmanager.common.exception.BadRequestException;
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.common.exception.UnprocessableContentException;
 import io.github.kocoding.taskmanager.project.entity.ProjectUserId;
@@ -171,6 +180,126 @@ public class TaskServiceTest {
 
         NotFoundException e = assertThrows(NotFoundException.class, () -> taskService.findTask(userId, taskId));
         assertEquals("タスクが存在しません", e.getMessage());
+    }
+
+    @Test
+    void findTasks_本人がメンバーでない場合はNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long projectId = 20L;
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(false);
+
+        NotFoundException e = assertThrows(NotFoundException.class,
+                () -> taskService.findTasks(userId, projectId, null, null, null, null, null, null));
+        assertEquals("プロジェクトが存在しません", e.getMessage());
+        verify(taskRepository, never()).findTasks(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void findTasks_dueDateFromがdueDateToより後の場合はBadRequestExceptionが発生する() {
+        Long userId = 1L;
+        Long projectId = 20L;
+        LocalDate dueDateFrom = LocalDate.of(2026, 1, 2);
+        LocalDate dueDateTo = LocalDate.of(2026, 1, 1);
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(true);
+
+        BadRequestException e = assertThrows(BadRequestException.class,
+                () -> taskService.findTasks(userId, projectId, null, null, null, dueDateFrom, dueDateTo, null));
+        assertEquals("期間の指定が正しくありません", e.getMessage());
+        verify(taskRepository, never()).findTasks(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void findTasks_許可されていないsortはBadRequestExceptionが発生する() {
+        Long userId = 1L;
+        Long projectId = 20L;
+        Pageable pageable = PageRequest.of(0, 20, Sort.by("foo"));
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(true);
+
+        assertThrows(BadRequestException.class,
+                () -> taskService.findTasks(userId, projectId, null, null, null, null, null, pageable));
+        verify(taskRepository, never()).findTasks(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void findTasks_許可されたsortは置き換えられt_idが最後に足される() {
+        Long userId = 1L;
+        Long projectId = 20L;
+        Pageable pageable = PageRequest.of(2, 10, Sort.by(Sort.Direction.DESC, "dueDate"));
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(true);
+
+        taskService.findTasks(userId, projectId, null, null, null, null, null, pageable);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(taskRepository).findTasks(eq(20L), any(), any(), any(), any(), any(), pageableCaptor.capture());
+        Pageable passed = pageableCaptor.getValue();
+
+        List<Sort.Order> orders = passed.getSort().toList();
+        assertEquals(2, orders.size());
+        assertEquals(2, passed.getPageNumber());
+        assertEquals(10, passed.getPageSize());
+
+        assertEquals("t.dueDate", orders.get(0).getProperty());
+        assertEquals(Sort.Direction.DESC, orders.get(0).getDirection());
+        assertEquals(Sort.NullHandling.NULLS_LAST, orders.get(0).getNullHandling());
+
+        assertEquals("t.id", orders.get(1).getProperty());
+        assertEquals(Sort.Direction.ASC, orders.get(1).getDirection());
+        assertEquals(Sort.NullHandling.NULLS_LAST, orders.get(1).getNullHandling());
+    }
+
+    @Test
+    void findTasks_sortの指定がなければcreatedAtの降順になりt_idが最後に足される() {
+        Long userId = 1L;
+        Long projectId = 20L;
+        Pageable pageable = PageRequest.of(2, 10);
+
+        when(projectUserRepository.existsById(new ProjectUserId(userId, projectId)))
+                .thenReturn(true);
+
+        taskService.findTasks(userId, projectId, null, null, null, null, null, pageable);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(taskRepository).findTasks(eq(20L), any(), any(), any(), any(), any(), pageableCaptor.capture());
+        Pageable passed = pageableCaptor.getValue();
+        List<Sort.Order> orders = passed.getSort().toList();
+
+        assertEquals(2, orders.size());
+        assertEquals(2, passed.getPageNumber());
+        assertEquals(10, passed.getPageSize());
+
+        assertEquals("t.createdAt", orders.get(0).getProperty());
+        assertEquals(Sort.Direction.DESC, orders.get(0).getDirection());
+        assertEquals(Sort.NullHandling.NULLS_LAST, orders.get(0).getNullHandling());
+
+        assertEquals("t.id", orders.get(1).getProperty());
+        assertEquals(Sort.Direction.ASC, orders.get(1).getDirection());
+        assertEquals(Sort.NullHandling.NULLS_LAST, orders.get(1).getNullHandling());
+    }
+
+    @Test
+    void findTasks_絞り込みの値が取り違えずに渡る() {
+        Pageable pageable = PageRequest.of(2, 10);
+        Page<TaskResponse> page = new PageImpl<>(List.of());
+
+        when(projectUserRepository.existsById(new ProjectUserId(1L, 20L)))
+                .thenReturn(true);
+        when(taskRepository.findTasks(any(), any(), any(), any(), any(), any(), any())).thenReturn(page);
+
+        Page<TaskResponse> response = taskService.findTasks(1L, 20L, TaskStatus.IN_PROGRESS, 100L, "abc",
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 1, 31), pageable);
+
+        verify(taskRepository).findTasks(eq(20L), eq(TaskStatus.IN_PROGRESS), eq(100L), eq("%abc%"),
+                eq(LocalDate.of(2026, 1, 1)), eq(LocalDate.of(2026, 1, 31)), any(Pageable.class));
+        assertSame(page, response);
     }
 
 }
