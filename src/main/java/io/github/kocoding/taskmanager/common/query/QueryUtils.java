@@ -1,5 +1,6 @@
 package io.github.kocoding.taskmanager.common.query;
 
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.data.domain.PageRequest;
@@ -25,17 +26,17 @@ public final class QueryUtils {
                 // なければ BadRequestException
                 throw new BadRequestException("sortに指定できない項目です:" + order.getProperty());
             }
-            // 2. 許可されたものは JpaSort.unsafe(向き, 許可リストの式) に変換
-            safeSort = safeSort.and(JpaSort.unsafe(order.getDirection(), allowList.get(order.getProperty())));
+            // 2. 許可されたものは、nullを最後にした並び(nullsLast)に変換
+            safeSort = safeSort.and(nullsLast(order.getDirection(), allowList.get(order.getProperty())));
         }
 
-        // 3. sortの指定がなければ defaultSort を defaultDirectionの向き
+        // 3. sortの指定がなければ、defaultSort を defaultDirectionの向きで並べる
         if (safeSort.isUnsorted()) {
-            safeSort = safeSort.and(JpaSort.unsafe(defaultDirection, defaultSort));
+            safeSort = safeSort.and(nullsLast(defaultDirection, defaultSort));
         }
 
         // 4. 最後に tieBreaker の昇順を必ず足す
-        safeSort = safeSort.and(JpaSort.unsafe(Sort.Direction.ASC, tieBreaker));
+        safeSort = safeSort.and(nullsLast(Sort.Direction.ASC, tieBreaker));
 
         // 5. PageRequest.of(ページ番号, size, sort) で返す
         return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), safeSort);
@@ -50,6 +51,13 @@ public final class QueryUtils {
         keyword = keyword.replace("_", "\\_");
 
         return "%" + keyword + "%";
+    }
+
+    private static Sort nullsLast(Sort.Direction direction, String expression) {
+        List<Sort.Order> orders = JpaSort.unsafe(direction, expression).stream()
+                .map(order -> order.with(Sort.NullHandling.NULLS_LAST))
+                .toList();
+        return Sort.by(orders);
     }
 
 }
