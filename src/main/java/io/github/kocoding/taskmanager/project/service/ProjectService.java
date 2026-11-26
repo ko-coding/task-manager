@@ -32,12 +32,12 @@ import io.github.kocoding.taskmanager.user.repository.UserRepository;
 @Service
 public class ProjectService {
 
-    private final UserRepository userRepository;
     private static final Map<String, String> PROJECT_SORT_ALLOWLIST = Map.of("name", "p.name", "createdAt",
             "p.createdAt");
     private static final Map<String, String> MEMBER_SORT_ALLOWLIST = Map.of("name", "u.name", "joinedAt",
             "pu.createdAt");
 
+    private final UserRepository userRepository;
     private final ProjectUserRepository projectUserRepository;
     private final ProjectRepository projectRepository;
     private final TeamUserRepository teamUserRepository;
