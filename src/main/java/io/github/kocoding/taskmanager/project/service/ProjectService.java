@@ -24,6 +24,7 @@ import io.github.kocoding.taskmanager.project.entity.ProjectUser;
 import io.github.kocoding.taskmanager.project.entity.ProjectUserId;
 import io.github.kocoding.taskmanager.project.repository.ProjectRepository;
 import io.github.kocoding.taskmanager.project.repository.ProjectUserRepository;
+import io.github.kocoding.taskmanager.task.repository.TaskRepository;
 import io.github.kocoding.taskmanager.team.entity.TeamUserId;
 import io.github.kocoding.taskmanager.team.repository.TeamUserRepository;
 import io.github.kocoding.taskmanager.user.entity.User;
@@ -41,13 +42,15 @@ public class ProjectService {
     private final ProjectUserRepository projectUserRepository;
     private final ProjectRepository projectRepository;
     private final TeamUserRepository teamUserRepository;
+    private final TaskRepository taskRepository;
 
     public ProjectService(TeamUserRepository teamUserRepository, ProjectRepository projectRepository,
-            ProjectUserRepository projectUserRepository, UserRepository userRepository) {
+            ProjectUserRepository projectUserRepository, UserRepository userRepository, TaskRepository taskRepository) {
         this.teamUserRepository = teamUserRepository;
         this.projectRepository = projectRepository;
         this.projectUserRepository = projectUserRepository;
         this.userRepository = userRepository;
+        this.taskRepository = taskRepository;
     }
 
     @Transactional
@@ -120,7 +123,7 @@ public class ProjectService {
             throw new ForbiddenException("プロジェクトを削除する権限がありません");
         }
 
-        // TODO: tasksができたら、project_usersより先にタスクを削除する
+        taskRepository.deleteByProjectId(projectId);
         projectUserRepository.deleteByIdProjectId(projectId);
         projectRepository.delete(project);
     }

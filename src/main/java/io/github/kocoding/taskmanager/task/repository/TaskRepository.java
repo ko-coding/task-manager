@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import io.github.kocoding.taskmanager.task.dto.TaskResponse;
@@ -35,5 +36,9 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
             """)
     Page<TaskResponse> findTasks(Long projectId, TaskStatus status, Long assignedTo, String pattern,
             LocalDate dueDateFrom, LocalDate dueDateTo, Pageable pageable);
+
+    @Modifying
+    @Query("delete from Task t where t.projectId = :projectId")
+    void deleteByProjectId(Long projectId);
 
 }
