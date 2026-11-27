@@ -121,6 +121,7 @@ public class TaskService {
             task.changeAssignedTo(request.getAssignedTo().orElse(null));
         }
 
+        taskRepository.flush();
         return TaskResponse.from(task);
     }
 
