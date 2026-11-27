@@ -191,8 +191,7 @@ public class ProjectService {
             throw new NotFoundException("メンバーが存在しません");
         }
 
-        // TODO: 担当タスクの assigned_to = NULL（tasks ができてから。）
-
+        taskRepository.clearAssignee(projectId, targetUserId);
         projectUserRepository.deleteById(new ProjectUserId(targetUserId, projectId));
     }
 
