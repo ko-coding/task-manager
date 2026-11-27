@@ -14,6 +14,9 @@ import io.github.kocoding.taskmanager.common.exception.ConflictException;
 import io.github.kocoding.taskmanager.common.exception.ForbiddenException;
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.common.query.QueryUtils;
+import io.github.kocoding.taskmanager.project.repository.ProjectRepository;
+import io.github.kocoding.taskmanager.project.repository.ProjectUserRepository;
+import io.github.kocoding.taskmanager.task.repository.TaskRepository;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamResponse;
 import io.github.kocoding.taskmanager.team.dto.JoinTeamRequest;
@@ -40,13 +43,20 @@ public class TeamService {
     private final TeamUserRepository teamUserRepository;
     private final TeamCodeGenerator teamCodeGenerator;
     private final TeamCodeHasher teamCodeHasher;
+    private final ProjectRepository projectRepository;
+    private final ProjectUserRepository projectUserRepository;
+    private final TaskRepository taskRepository;
 
     public TeamService(TeamRepository teamRepository, TeamUserRepository teamUserRepository,
-            TeamCodeGenerator teamCodeGenerator, TeamCodeHasher teamCodeHasher) {
+            TeamCodeGenerator teamCodeGenerator, TeamCodeHasher teamCodeHasher, TaskRepository taskRepository,
+            ProjectUserRepository projectUserRepository, ProjectRepository projectRepository) {
         this.teamRepository = teamRepository;
         this.teamUserRepository = teamUserRepository;
         this.teamCodeGenerator = teamCodeGenerator;
         this.teamCodeHasher = teamCodeHasher;
+        this.taskRepository = taskRepository;
+        this.projectUserRepository = projectUserRepository;
+        this.projectRepository = projectRepository;
     }
 
     @Transactional
@@ -164,6 +174,25 @@ public class TeamService {
 
         return teamUserRepository.findMember(teamId, targetUserId)
                 .orElseThrow(() -> new NotFoundException("メンバーが存在しません"));
+    }
+
+    @Transactional
+    public void delete(Long userId, Long teamId) {
+        TeamUser teamUser = teamUserRepository.findById(new TeamUserId(teamId, userId))
+                .orElseThrow(() -> new NotFoundException("チームが存在しません"));
+
+        if (teamUser.getRole() != TeamRole.OWNER) {
+            throw new ForbiddenException("チームを削除する権限がありません");
+        }
+
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new NotFoundException("チームが存在しません"));
+
+        taskRepository.deleteByTeamId(teamId);
+        projectUserRepository.deleteByTeamId(teamId);
+        projectRepository.deleteByTeamId(teamId);
+        teamUserRepository.deleteByTeamId(teamId);
+        teamRepository.delete(team);
     }
 
 }
