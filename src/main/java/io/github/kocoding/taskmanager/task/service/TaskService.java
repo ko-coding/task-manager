@@ -144,4 +144,20 @@ public class TaskService {
         return TaskResponse.from(task);
     }
 
+    @Transactional
+    public void deleteTask(Long userId, Long taskId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException("タスクが存在しません"));
+
+        if (!projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId()))) {
+            throw new NotFoundException("タスクが存在しません");
+        }
+
+        if (!userId.equals(task.getCreatedBy())) {
+            throw new ForbiddenException("タスクを削除する権限がありません");
+        }
+
+        taskRepository.delete(task);
+    }
+
 }
