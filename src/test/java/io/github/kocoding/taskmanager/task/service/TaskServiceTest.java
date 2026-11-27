@@ -36,6 +36,7 @@ import io.github.kocoding.taskmanager.project.repository.ProjectUserRepository;
 import io.github.kocoding.taskmanager.task.dto.CreateTaskRequest;
 import io.github.kocoding.taskmanager.task.dto.TaskResponse;
 import io.github.kocoding.taskmanager.task.dto.UpdateTaskRequest;
+import io.github.kocoding.taskmanager.task.dto.UpdateTaskStatusRequest;
 import io.github.kocoding.taskmanager.task.entity.Task;
 import io.github.kocoding.taskmanager.task.entity.TaskStatus;
 import io.github.kocoding.taskmanager.task.repository.TaskRepository;
@@ -464,6 +465,111 @@ public class TaskServiceTest {
         assertNull(response.dueDate());
         assertNull(response.assignedTo());
         verify(projectUserRepository).existsById(any(ProjectUserId.class));
+    }
+
+    @Test
+    void updateTaskStatus_作成者ならステータスを更新できる() {
+        Long userId = 1L;
+        Long taskId = 50L;
+        UpdateTaskStatusRequest request = new UpdateTaskStatusRequest(TaskStatus.DONE);
+        Task task = new Task(20L, 100L, userId, "title", "description", TaskStatus.IN_PROGRESS,
+                LocalDate.of(2026, 1, 1));
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(task));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId())))
+                .thenReturn(true);
+
+        TaskResponse response = taskService.updateTaskStatus(userId, taskId, request);
+
+        assertEquals(TaskStatus.DONE, response.status());
+    }
+
+    @Test
+    void updateTaskStatus_担当者ならステータスを更新できる() {
+        Long userId = 1L;
+        Long taskId = 50L;
+        UpdateTaskStatusRequest request = new UpdateTaskStatusRequest(TaskStatus.DONE);
+        Task task = new Task(20L, userId, 100L, "title", "description", TaskStatus.IN_PROGRESS,
+                LocalDate.of(2026, 1, 1));
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(task));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId())))
+                .thenReturn(true);
+
+        TaskResponse response = taskService.updateTaskStatus(userId, taskId, request);
+
+        assertEquals(TaskStatus.DONE, response.status());
+    }
+
+    @Test
+    void updateTaskStatus_作成者か担当者でない場合はForbiddenExceptionが発生する() {
+        Long userId = 1L;
+        Long taskId = 50L;
+        UpdateTaskStatusRequest request = new UpdateTaskStatusRequest(TaskStatus.DONE);
+        Task task = new Task(20L, 100L, 100L, "title", "description", TaskStatus.IN_PROGRESS,
+                LocalDate.of(2026, 1, 1));
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(task));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId())))
+                .thenReturn(true);
+
+        ForbiddenException e = assertThrows(ForbiddenException.class,
+                () -> taskService.updateTaskStatus(userId, taskId, request));
+        assertEquals("ステータスを更新する権限がありません", e.getMessage());
+    }
+
+    @Test
+    void updateTaskStatus_担当者が未設定で作成者以外のメンバーが更新しようとするとForbiddenExceptionが発生する() {
+        Long userId = 1L;
+        Long taskId = 50L;
+        UpdateTaskStatusRequest request = new UpdateTaskStatusRequest(TaskStatus.DONE);
+        Task task = new Task(20L, null, 100L, "title", "description", TaskStatus.IN_PROGRESS,
+                LocalDate.of(2026, 1, 1));
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(task));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId())))
+                .thenReturn(true);
+
+        ForbiddenException e = assertThrows(ForbiddenException.class,
+                () -> taskService.updateTaskStatus(userId, taskId, request));
+        assertEquals("ステータスを更新する権限がありません", e.getMessage());
+    }
+
+    @Test
+    void updateTaskStatus_タスクが存在しない場合はNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long taskId = 50L;
+        UpdateTaskStatusRequest request = new UpdateTaskStatusRequest(TaskStatus.DONE);
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.empty());
+
+        NotFoundException e = assertThrows(NotFoundException.class,
+                () -> taskService.updateTaskStatus(userId, taskId, request));
+        assertEquals("タスクが存在しません", e.getMessage());
+        verify(projectUserRepository, never()).existsById(any(ProjectUserId.class));
+    }
+
+    @Test
+    void updateTaskStatus_本人がメンバーでない場合はNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long taskId = 50L;
+        UpdateTaskStatusRequest request = new UpdateTaskStatusRequest(TaskStatus.DONE);
+        Task task = new Task(20L, null, 100L, "title", "description", TaskStatus.IN_PROGRESS,
+                LocalDate.of(2026, 1, 1));
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(task));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId())))
+                .thenReturn(false);
+
+        NotFoundException e = assertThrows(NotFoundException.class,
+                () -> taskService.updateTaskStatus(userId, taskId, request));
+        assertEquals("タスクが存在しません", e.getMessage());
     }
 
 }
