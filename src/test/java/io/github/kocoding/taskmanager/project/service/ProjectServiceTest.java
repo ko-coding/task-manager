@@ -41,6 +41,7 @@ import io.github.kocoding.taskmanager.project.entity.ProjectUser;
 import io.github.kocoding.taskmanager.project.entity.ProjectUserId;
 import io.github.kocoding.taskmanager.project.repository.ProjectRepository;
 import io.github.kocoding.taskmanager.project.repository.ProjectUserRepository;
+import io.github.kocoding.taskmanager.task.repository.TaskRepository;
 import io.github.kocoding.taskmanager.team.entity.TeamUserId;
 import io.github.kocoding.taskmanager.team.repository.TeamUserRepository;
 import io.github.kocoding.taskmanager.user.entity.User;
@@ -60,6 +61,9 @@ public class ProjectServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private TaskRepository taskRepository;
 
     @InjectMocks
     private ProjectService projectService;
@@ -326,7 +330,8 @@ public class ProjectServiceTest {
 
         projectService.deleteProject(userId, projectId);
 
-        InOrder inOrder = inOrder(projectUserRepository, projectRepository);
+        InOrder inOrder = inOrder(taskRepository, projectUserRepository, projectRepository);
+        inOrder.verify(taskRepository).deleteByProjectId(projectId);
         inOrder.verify(projectUserRepository).deleteByIdProjectId(projectId);
         inOrder.verify(projectRepository).delete(project);
     }
@@ -343,6 +348,7 @@ public class ProjectServiceTest {
                 () -> projectService.deleteProject(userId, projectId));
         assertEquals("プロジェクトが存在しません", e.getMessage());
         verify(projectRepository, never()).findById(projectId);
+        verify(taskRepository, never()).deleteByProjectId(projectId);
         verify(projectUserRepository, never()).deleteByIdProjectId(projectId);
         verify(projectRepository, never()).delete(any());
     }
@@ -362,6 +368,7 @@ public class ProjectServiceTest {
         ForbiddenException e = assertThrows(ForbiddenException.class,
                 () -> projectService.deleteProject(userId, projectId));
         assertEquals("プロジェクトを削除する権限がありません", e.getMessage());
+        verify(taskRepository, never()).deleteByProjectId(projectId);
         verify(projectUserRepository, never()).deleteByIdProjectId(projectId);
         verify(projectRepository, never()).delete(project);
     }
