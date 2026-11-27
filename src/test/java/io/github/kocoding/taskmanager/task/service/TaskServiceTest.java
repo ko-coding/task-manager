@@ -572,4 +572,65 @@ public class TaskServiceTest {
         assertEquals("タスクが存在しません", e.getMessage());
     }
 
+    @Test
+    void deleteTask_作成者ならタスクを削除できる() {
+        Long userId = 1L;
+        Long taskId = 50L;
+        Task task = new Task(10L, 20L, userId, "title", "description", null, null);
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(task));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, 10L)))
+                .thenReturn(true);
+
+        taskService.deleteTask(userId, taskId);
+
+        verify(taskRepository).delete(task);
+    }
+
+    @Test
+    void deleteTask_タスクが存在しない場合はNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long taskId = 50L;
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.empty());
+
+        NotFoundException e = assertThrows(NotFoundException.class, () -> taskService.deleteTask(userId, taskId));
+        assertEquals("タスクが存在しません", e.getMessage());
+
+        verify(projectUserRepository, never()).existsById(any(ProjectUserId.class));
+        verify(taskRepository, never()).delete(any(Task.class));
+    }
+
+    @Test
+    void deleteTask_メンバーでない場合はNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long taskId = 50L;
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(new Task(10L, 20L, 100L, "title", "description", null, null)));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, 10L)))
+                .thenReturn(false);
+
+        NotFoundException e = assertThrows(NotFoundException.class, () -> taskService.deleteTask(userId, taskId));
+        assertEquals("タスクが存在しません", e.getMessage());
+        verify(taskRepository, never()).delete(any(Task.class));
+    }
+
+    @Test
+    void deleteTask_作成者ではないメンバーが削除しようとするとForbiddenExceptionが発生する() {
+        Long userId = 1L;
+        Long taskId = 50L;
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(new Task(10L, 20L, 100L, "title", "description", null, null)));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, 10L)))
+                .thenReturn(true);
+
+        ForbiddenException e = assertThrows(ForbiddenException.class, () -> taskService.deleteTask(userId, taskId));
+        assertEquals("タスクを削除する権限がありません", e.getMessage());
+        verify(taskRepository, never()).delete(any(Task.class));
+    }
+
 }
