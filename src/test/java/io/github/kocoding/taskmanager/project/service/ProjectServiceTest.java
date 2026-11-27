@@ -561,7 +561,9 @@ public class ProjectServiceTest {
 
         projectService.removeMember(userId, projectId, targetUserId);
 
-        verify(projectUserRepository).deleteById(new ProjectUserId(3L, 20L));
+        InOrder inOrder = inOrder(taskRepository, projectUserRepository);
+        inOrder.verify(taskRepository).clearAssignee(projectId, targetUserId);
+        inOrder.verify(projectUserRepository).deleteById(new ProjectUserId(targetUserId, projectId));
     }
 
     @Test
@@ -578,6 +580,7 @@ public class ProjectServiceTest {
         assertEquals("プロジェクトが存在しません", e.getMessage());
         verify(projectRepository, never()).findById(projectId);
         verify(projectUserRepository, never()).existsById(new ProjectUserId(targetUserId, projectId));
+        verify(taskRepository, never()).clearAssignee(any(), any());
         verify(projectUserRepository, never()).deleteById(any(ProjectUserId.class));
     }
 
@@ -597,6 +600,7 @@ public class ProjectServiceTest {
                 () -> projectService.removeMember(userId, projectId, targetUserId));
         assertEquals("プロジェクトメンバーを削除する権限がありません", e.getMessage());
         verify(projectUserRepository, never()).existsById(new ProjectUserId(targetUserId, projectId));
+        verify(taskRepository, never()).clearAssignee(any(), any());
         verify(projectUserRepository, never()).deleteById(any(ProjectUserId.class));
     }
 
@@ -616,6 +620,7 @@ public class ProjectServiceTest {
                 () -> projectService.removeMember(userId, projectId, targetUserId));
         assertEquals("作成者はプロジェクトから削除できません", e.getMessage());
         verify(projectUserRepository).existsById(any(ProjectUserId.class));
+        verify(taskRepository, never()).clearAssignee(any(), any());
         verify(projectUserRepository, never()).deleteById(any(ProjectUserId.class));
     }
 
@@ -636,6 +641,7 @@ public class ProjectServiceTest {
         NotFoundException e = assertThrows(NotFoundException.class,
                 () -> projectService.removeMember(userId, projectId, targetUserId));
         assertEquals("メンバーが存在しません", e.getMessage());
+        verify(taskRepository, never()).clearAssignee(any(), any());
         verify(projectUserRepository, never()).deleteById(any(ProjectUserId.class));
     }
 
