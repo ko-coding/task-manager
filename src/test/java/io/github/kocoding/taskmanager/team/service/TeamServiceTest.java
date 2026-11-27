@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -16,6 +17,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -28,6 +30,9 @@ import io.github.kocoding.taskmanager.common.exception.BadRequestException;
 import io.github.kocoding.taskmanager.common.exception.ConflictException;
 import io.github.kocoding.taskmanager.common.exception.ForbiddenException;
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
+import io.github.kocoding.taskmanager.project.repository.ProjectRepository;
+import io.github.kocoding.taskmanager.project.repository.ProjectUserRepository;
+import io.github.kocoding.taskmanager.task.repository.TaskRepository;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamRequest;
 import io.github.kocoding.taskmanager.team.dto.CreateTeamResponse;
 import io.github.kocoding.taskmanager.team.dto.JoinTeamRequest;
@@ -44,6 +49,15 @@ import io.github.kocoding.taskmanager.team.repository.TeamUserRepository;
 
 @ExtendWith(MockitoExtension.class)
 public class TeamServiceTest {
+
+    @Mock
+    private TaskRepository taskRepository;
+
+    @Mock
+    private ProjectRepository projectRepository;
+
+    @Mock
+    private ProjectUserRepository projectUserRepository;
 
     @Mock
     private TeamRepository teamRepository;
@@ -556,6 +570,65 @@ public class TeamServiceTest {
                 () -> teamService.updateRole(userId, teamId, targetUserId, request));
         assertEquals("既にOWNERです", e.getMessage());
         verify(teamUserRepository, never()).findMember(teamId, targetUserId);
+    }
+
+    @Test
+    void delete_正常に削除できる() {
+        Long userId = 1L;
+        Long teamId = 10L;
+        Team team = new Team(userId, "hashed", "test", "test");
+        ReflectionTestUtils.setField(team, "id", teamId);
+
+        when(teamUserRepository.findById(new TeamUserId(teamId, userId)))
+                .thenReturn(Optional.of(new TeamUser(teamId, userId, TeamRole.OWNER)));
+        when(teamRepository.findById(teamId))
+                .thenReturn(Optional.of(team));
+
+        teamService.delete(userId, teamId);
+
+        InOrder inOrder = inOrder(taskRepository, projectUserRepository, projectRepository, teamUserRepository,
+                teamRepository);
+        inOrder.verify(taskRepository).deleteByTeamId(teamId);
+        inOrder.verify(projectUserRepository).deleteByTeamId(teamId);
+        inOrder.verify(projectRepository).deleteByTeamId(teamId);
+        inOrder.verify(teamUserRepository).deleteByTeamId(teamId);
+        inOrder.verify(teamRepository).delete(team);
+    }
+
+    @Test
+    void delete_本人がメンバーでない場合はNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long teamId = 10L;
+
+        when(teamUserRepository.findById(new TeamUserId(teamId, userId)))
+                .thenReturn(Optional.empty());
+
+        NotFoundException e = assertThrows(NotFoundException.class, () -> teamService.delete(userId, teamId));
+        assertEquals("チームが存在しません", e.getMessage());
+        verify(teamRepository, never()).findById(any(Long.class));
+        verify(taskRepository, never()).deleteByTeamId(any(Long.class));
+        verify(projectUserRepository, never()).deleteByTeamId(any(Long.class));
+        verify(projectRepository, never()).deleteByTeamId(any(Long.class));
+        verify(teamUserRepository, never()).deleteByTeamId(any(Long.class));
+        verify(teamRepository, never()).delete(any(Team.class));
+    }
+
+    @Test
+    void delete_本人がMEMBERの場合はForbiddenExceptionが発生する() {
+        Long userId = 1L;
+        Long teamId = 10L;
+
+        when(teamUserRepository.findById(new TeamUserId(teamId, userId)))
+                .thenReturn(Optional.of(new TeamUser(teamId, userId, TeamRole.MEMBER)));
+
+        ForbiddenException e = assertThrows(ForbiddenException.class, () -> teamService.delete(userId, teamId));
+        assertEquals("チームを削除する権限がありません", e.getMessage());
+        verify(teamRepository, never()).findById(any(Long.class));
+        verify(taskRepository, never()).deleteByTeamId(any(Long.class));
+        verify(projectUserRepository, never()).deleteByTeamId(any(Long.class));
+        verify(projectRepository, never()).deleteByTeamId(any(Long.class));
+        verify(teamUserRepository, never()).deleteByTeamId(any(Long.class));
+        verify(teamRepository, never()).delete(any(Team.class));
     }
 
 }
