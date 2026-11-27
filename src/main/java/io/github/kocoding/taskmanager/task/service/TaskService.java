@@ -19,6 +19,7 @@ import io.github.kocoding.taskmanager.project.repository.ProjectUserRepository;
 import io.github.kocoding.taskmanager.task.dto.CreateTaskRequest;
 import io.github.kocoding.taskmanager.task.dto.TaskResponse;
 import io.github.kocoding.taskmanager.task.dto.UpdateTaskRequest;
+import io.github.kocoding.taskmanager.task.dto.UpdateTaskStatusRequest;
 import io.github.kocoding.taskmanager.task.entity.Task;
 import io.github.kocoding.taskmanager.task.entity.TaskStatus;
 import io.github.kocoding.taskmanager.task.repository.TaskRepository;
@@ -121,6 +122,24 @@ public class TaskService {
             task.changeAssignedTo(request.getAssignedTo().orElse(null));
         }
 
+        taskRepository.flush();
+        return TaskResponse.from(task);
+    }
+
+    @Transactional
+    public TaskResponse updateTaskStatus(Long userId, Long taskId, UpdateTaskStatusRequest request) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException("タスクが存在しません"));
+
+        if (!projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId()))) {
+            throw new NotFoundException("タスクが存在しません");
+        }
+
+        if (!userId.equals(task.getCreatedBy()) && !userId.equals(task.getAssignedTo())) {
+            throw new ForbiddenException("ステータスを更新する権限がありません");
+        }
+
+        task.changeStatus(request.status());
         taskRepository.flush();
         return TaskResponse.from(task);
     }

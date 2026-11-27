@@ -72,6 +72,10 @@ public class Task extends BaseTimeEntity {
         this.assignedTo = assignedTo;
     }
 
+    public void changeStatus(TaskStatus status) {
+        this.status = status;
+    }
+
     public Long getId() {
         return id;
     }
