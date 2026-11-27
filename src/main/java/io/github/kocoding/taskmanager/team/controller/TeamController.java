@@ -6,6 +6,7 @@ import org.springframework.data.web.PagedModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -84,6 +85,12 @@ public class TeamController {
             @PathVariable Long teamId, @PathVariable("userId") Long targetUserId,
             @Valid @RequestBody UpdateMemberRoleRequest request) {
         return ResponseEntity.ok(teamService.updateRole(userId, teamId, targetUserId, request));
+    }
+
+    @DeleteMapping("/{teamId}")
+    public ResponseEntity<Void> deleteTeam(@AuthenticationPrincipal Long userId, @PathVariable Long teamId) {
+        teamService.delete(userId, teamId);
+        return ResponseEntity.noContent().build();
     }
 
 }
