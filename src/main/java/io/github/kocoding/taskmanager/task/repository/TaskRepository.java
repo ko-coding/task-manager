@@ -42,6 +42,10 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     void deleteByProjectId(Long projectId);
 
     @Modifying
+    @Query("delete from Task t where t.projectId in (select p.id from Project p where p.teamId = :teamId)")
+    void deleteByTeamId(Long teamId);
+
+    @Modifying
     @Query("update Task t set t.assignedTo = null, t.updatedAt = current_timestamp where t.projectId = :projectId and t.assignedTo = :userId")
     void clearAssignee(Long projectId, Long userId);
 

@@ -5,6 +5,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import io.github.kocoding.taskmanager.team.dto.TeamMemberResponse;
@@ -48,5 +49,9 @@ public interface TeamUserRepository extends JpaRepository<TeamUser, TeamUserId> 
             where tu.id.teamId = :teamId
             """)
     Page<TeamMemberResponse> findMembers(Long teamId, Pageable pageable);
+
+    @Modifying
+    @Query("delete from TeamUser tu where tu.id.teamId = :teamId")
+    void deleteByTeamId(Long teamId);
 
 }

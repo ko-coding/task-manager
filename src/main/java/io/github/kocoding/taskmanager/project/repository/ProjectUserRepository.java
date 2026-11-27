@@ -3,6 +3,7 @@ package io.github.kocoding.taskmanager.project.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import io.github.kocoding.taskmanager.project.dto.ProjectMemberResponse;
@@ -39,5 +40,9 @@ public interface ProjectUserRepository extends JpaRepository<ProjectUser, Projec
     Page<ProjectMemberResponse> findMembers(Long projectId, Pageable pageable);
 
     void deleteByIdProjectId(Long projectId);
+
+    @Modifying
+    @Query("delete from ProjectUser pu where pu.teamId = :teamId")
+    void deleteByTeamId(Long teamId);
 
 }
