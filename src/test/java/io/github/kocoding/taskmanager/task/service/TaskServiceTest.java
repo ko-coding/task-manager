@@ -28,12 +28,14 @@ import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import io.github.kocoding.taskmanager.common.exception.BadRequestException;
+import io.github.kocoding.taskmanager.common.exception.ForbiddenException;
 import io.github.kocoding.taskmanager.common.exception.NotFoundException;
 import io.github.kocoding.taskmanager.common.exception.UnprocessableContentException;
 import io.github.kocoding.taskmanager.project.entity.ProjectUserId;
 import io.github.kocoding.taskmanager.project.repository.ProjectUserRepository;
 import io.github.kocoding.taskmanager.task.dto.CreateTaskRequest;
 import io.github.kocoding.taskmanager.task.dto.TaskResponse;
+import io.github.kocoding.taskmanager.task.dto.UpdateTaskRequest;
 import io.github.kocoding.taskmanager.task.entity.Task;
 import io.github.kocoding.taskmanager.task.entity.TaskStatus;
 import io.github.kocoding.taskmanager.task.repository.TaskRepository;
@@ -300,6 +302,168 @@ public class TaskServiceTest {
         verify(taskRepository).findTasks(eq(20L), eq(TaskStatus.IN_PROGRESS), eq(100L), eq("%abc%"),
                 eq(LocalDate.of(2026, 1, 1)), eq(LocalDate.of(2026, 1, 31)), any(Pageable.class));
         assertSame(page, response);
+    }
+
+    @Test
+    void updateTask_作成者が指定した項目のみ更新される() {
+        Long userId = 1L;
+        Long taskId = 50L;
+        UpdateTaskRequest request = new UpdateTaskRequest();
+        request.setTitle(Optional.of("new title"));
+        Task task = new Task(20L, 100L, userId, "title", "description", TaskStatus.IN_PROGRESS,
+                LocalDate.of(2026, 1, 1));
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(task));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId())))
+                .thenReturn(true);
+
+        TaskResponse response = taskService.updateTask(userId, taskId, request);
+
+        assertEquals("new title", response.title());
+        assertEquals("description", response.description());
+        assertEquals(LocalDate.of(2026, 1, 1), response.dueDate());
+        assertEquals(100L, response.assignedTo());
+        verify(projectUserRepository).existsById(any(ProjectUserId.class));
+    }
+
+    @Test
+    void updateTask_同じプロジェクトメンバーを担当者として更新できる() {
+        Long userId = 1L;
+        Long taskId = 50L;
+        UpdateTaskRequest request = new UpdateTaskRequest();
+        request.setAssignedTo(Optional.of(200L));
+        Task task = new Task(20L, 100L, userId, "title", "description", TaskStatus.IN_PROGRESS,
+                LocalDate.of(2026, 1, 1));
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(task));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId())))
+                .thenReturn(true);
+        when(projectUserRepository.existsById(new ProjectUserId(request.getAssignedTo().get(), task.getProjectId())))
+                .thenReturn(true);
+
+        TaskResponse response = taskService.updateTask(userId, taskId, request);
+
+        assertEquals(200L, response.assignedTo());
+    }
+
+    @Test
+    void updateTask_タスクが存在しない場合はNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long taskId = 50L;
+        UpdateTaskRequest request = new UpdateTaskRequest();
+        request.setTitle(Optional.of("new title"));
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.empty());
+
+        NotFoundException e = assertThrows(NotFoundException.class,
+                () -> taskService.updateTask(userId, taskId, request));
+        assertEquals("タスクが存在しません", e.getMessage());
+        verify(projectUserRepository, never()).existsById(any(ProjectUserId.class));
+    }
+
+    @Test
+    void updateTask_本人がメンバーでない場合はNotFoundExceptionが発生する() {
+        Long userId = 1L;
+        Long taskId = 50L;
+        UpdateTaskRequest request = new UpdateTaskRequest();
+        request.setTitle(Optional.of("new title"));
+        Task task = new Task(20L, null, 100L, "title", "description", TaskStatus.IN_PROGRESS, null);
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(task));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId())))
+                .thenReturn(false);
+
+        NotFoundException e = assertThrows(NotFoundException.class,
+                () -> taskService.updateTask(userId, taskId, request));
+        assertEquals("タスクが存在しません", e.getMessage());
+        verify(projectUserRepository).existsById(any(ProjectUserId.class));
+    }
+
+    @Test
+    void updateTask_本人が作成者でない場合はForbiddenExceptionが発生する() {
+        Long userId = 1L;
+        Long taskId = 50L;
+        UpdateTaskRequest request = new UpdateTaskRequest();
+        request.setTitle(Optional.of("new title"));
+        Task task = new Task(20L, null, 100L, "title", "description", TaskStatus.IN_PROGRESS, null);
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(task));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId())))
+                .thenReturn(true);
+
+        ForbiddenException e = assertThrows(ForbiddenException.class,
+                () -> taskService.updateTask(userId, taskId, request));
+        assertEquals("タスクを更新する権限がありません", e.getMessage());
+        verify(projectUserRepository).existsById(any(ProjectUserId.class));
+    }
+
+    @Test
+    void updateTask_タスク名にnullを指定した場合はBadRequestExceptionが発生する() {
+        Long userId = 1L;
+        Long taskId = 50L;
+        UpdateTaskRequest request = new UpdateTaskRequest();
+        request.setTitle(Optional.empty());
+        Task task = new Task(20L, null, userId, "title", "description", TaskStatus.IN_PROGRESS, null);
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(task));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId())))
+                .thenReturn(true);
+
+        BadRequestException e = assertThrows(BadRequestException.class,
+                () -> taskService.updateTask(userId, taskId, request));
+        assertEquals("タスク名にnullは指定できません", e.getMessage());
+        verify(projectUserRepository).existsById(any(ProjectUserId.class));
+    }
+
+    @Test
+    void updateTask_担当者にプロジェクトメンバー以外を指定した場合はUnprocessableContentExceptionが発生する() {
+        Long userId = 1L;
+        Long taskId = 50L;
+        UpdateTaskRequest request = new UpdateTaskRequest();
+        request.setAssignedTo(Optional.of(100L));
+        Task task = new Task(20L, null, userId, "title", "description", TaskStatus.IN_PROGRESS, null);
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(task));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId())))
+                .thenReturn(true);
+        when(projectUserRepository.existsById(new ProjectUserId(request.getAssignedTo().get(), task.getProjectId())))
+                .thenReturn(false);
+
+        UnprocessableContentException e = assertThrows(UnprocessableContentException.class,
+                () -> taskService.updateTask(userId, taskId, request));
+        assertEquals("担当者はプロジェクトのメンバーである必要があります", e.getMessage());
+    }
+
+    @Test
+    void updateTask_タスク名以外はnullを指定して解除できる() {
+        Long userId = 1L;
+        Long taskId = 50L;
+        UpdateTaskRequest request = new UpdateTaskRequest();
+        request.setDescription(Optional.empty());
+        request.setDueDate(Optional.empty());
+        request.setAssignedTo(Optional.empty());
+        Task task = new Task(20L, 100L, userId, "title", "description", TaskStatus.IN_PROGRESS,
+                LocalDate.of(2026, 1, 1));
+
+        when(taskRepository.findById(taskId))
+                .thenReturn(Optional.of(task));
+        when(projectUserRepository.existsById(new ProjectUserId(userId, task.getProjectId())))
+                .thenReturn(true);
+
+        TaskResponse response = taskService.updateTask(userId, taskId, request);
+
+        assertEquals("title", response.title());
+        assertNull(response.description());
+        assertNull(response.dueDate());
+        assertNull(response.assignedTo());
+        verify(projectUserRepository).existsById(any(ProjectUserId.class));
     }
 
 }
