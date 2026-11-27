@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import io.github.kocoding.taskmanager.task.dto.CreateTaskRequest;
 import io.github.kocoding.taskmanager.task.dto.TaskResponse;
 import io.github.kocoding.taskmanager.task.dto.UpdateTaskRequest;
+import io.github.kocoding.taskmanager.task.dto.UpdateTaskStatusRequest;
 import io.github.kocoding.taskmanager.task.entity.TaskStatus;
 import io.github.kocoding.taskmanager.task.service.TaskService;
 import jakarta.validation.Valid;
@@ -57,6 +58,12 @@ public class TaskController {
     public ResponseEntity<TaskResponse> updateTask(@AuthenticationPrincipal Long userId, @PathVariable Long taskId,
             @Valid @RequestBody UpdateTaskRequest request) {
         return ResponseEntity.ok(taskService.updateTask(userId, taskId, request));
+    }
+
+    @PatchMapping("/api/tasks/{taskId}/status")
+    public ResponseEntity<TaskResponse> updateTaskStatus(@AuthenticationPrincipal Long userId,
+            @PathVariable Long taskId, @Valid @RequestBody UpdateTaskStatusRequest request) {
+        return ResponseEntity.ok(taskService.updateTaskStatus(userId, taskId, request));
     }
 
 }
